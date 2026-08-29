@@ -2,7 +2,9 @@ package com.tveaker.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tveaker.app.BuildConfig
 import com.tveaker.app.TVeakerApplication
+import com.tveaker.app.data.model.AppVersionDto
 import com.tveaker.app.data.model.RecommendationItemDto
 import com.tveaker.app.data.model.ShowEstimateDto
 import com.tveaker.app.data.model.UnwatchedEpisodesResponseDto
@@ -22,7 +24,9 @@ data class DashboardUiState(
     val isSyncing: Boolean = false,
     val selectedShowUnwatched: UnwatchedEpisodesResponseDto? = null,
     val isEpisodesLoading: Boolean = false,
-    val currentServerUrl: String = ""
+    val currentServerUrl: String = "",
+    val serverVersionInfo: AppVersionDto? = null,
+    val isNewUpdateAvailable: Boolean = false
 )
 
 class DashboardViewModel(
@@ -54,6 +58,10 @@ class DashboardViewModel(
 
             val showsResult = repository.getShows("watching")
             val recResult = repository.getRecommendations(limit = 6)
+            val versionResult = repository.getAppVersion()
+
+            val versionInfo = versionResult.getOrNull()
+            val hasUpdate = versionInfo != null && versionInfo.versionCode > BuildConfig.VERSION_CODE
 
             if (showsResult.isSuccess || recResult.isSuccess) {
                 _uiState.value = _uiState.value.copy(
@@ -61,7 +69,9 @@ class DashboardViewModel(
                     activeShows = showsResult.getOrNull() ?: emptyList(),
                     recommendations = recResult.getOrNull()?.items ?: emptyList(),
                     runId = recResult.getOrNull()?.runId,
-                    errorMessage = null
+                    errorMessage = null,
+                    serverVersionInfo = versionInfo,
+                    isNewUpdateAvailable = hasUpdate
                 )
             } else {
                 val error = showsResult.exceptionOrNull()?.message
@@ -69,7 +79,9 @@ class DashboardViewModel(
                     ?: "Cannot connect to server at ${repository.currentBaseUrl.value}"
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = error
+                    errorMessage = error,
+                    serverVersionInfo = versionInfo,
+                    isNewUpdateAvailable = hasUpdate
                 )
             }
         }

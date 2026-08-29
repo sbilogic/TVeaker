@@ -749,12 +749,12 @@ def api_get_app_version() -> dict[str, Any]:
     size_bytes = apk_path.stat().st_size if apk_path.exists() else None
 
     return {
-        "version_code": 3,
-        "version_name": "1.2.0",
+        "version_code": 4,
+        "version_name": "1.2.1",
         "apk_url": "/api/v1/app/download-apk",
         "changelog": (
-            "Poster artwork support, exact unwatched episodes breakdown sheet, "
-            "and TVDB/TVMaze image integration."
+            "Automatic Wi-Fi LAN host discovery, shared persistent repository, "
+            "poster artwork, and exact unwatched episodes breakdown."
         ),
         "release_date": "2026-08-29",
         "apk_size_bytes": size_bytes,
@@ -774,5 +774,5 @@ def api_download_apk() -> Any:
     return FileResponse(
         path=str(apk_path),
         media_type="application/vnd.android.package-archive",
-        filename="tveaker-v1.2.0.apk",
+        filename="tveaker-v1.2.1.apk",
     )

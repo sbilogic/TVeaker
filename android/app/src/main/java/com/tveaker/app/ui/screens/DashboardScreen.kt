@@ -136,6 +136,29 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // OTA Update Available Banner
+                if (state.isNewUpdateAvailable && state.serverVersionInfo != null) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = AccentPurple.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentPurple.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("⚡ New Update Available (v${state.serverVersionInfo?.versionName})", fontWeight = FontWeight.Bold, color = AccentPurple, fontSize = 13.sp)
+                                    Text(state.serverVersionInfo?.changelog ?: "New features and performance improvements", color = TextSecondary, fontSize = 11.sp, maxLines = 1)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Mobile Stats Overview Ribbon
                 item {
                     val totalEpsLeft = state.activeShows.sumOf { it.remainingEpisodes }
