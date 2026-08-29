@@ -2,10 +2,10 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from tveaker.clock import Clock, SystemClock
@@ -14,6 +14,7 @@ from tveaker.models import (
     Account,
     Episode,
     MediaItem,
+    SyncCursor,
     SyncRun,
     TrackedShow,
     WatchEvent,
@@ -34,6 +35,24 @@ from tveaker.trakt.client import TraktClient
 from tveaker.trakt.schemas import TraktMovie, TraktShow
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_utc(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def _is_newer(remote_dt: datetime | None, local_dt: datetime | None) -> bool:
+    if remote_dt is None:
+        return False
+    if local_dt is None:
+        return True
+    rem_utc = _ensure_utc(remote_dt)
+    loc_utc = _ensure_utc(local_dt)
+    return rem_utc is not None and loc_utc is not None and rem_utc > loc_utc
 
 
 @dataclass(frozen=True)
@@ -62,7 +81,16 @@ class AccountSync:
         self.clock = clock or SystemClock()
 
     def run(self, mode: Literal["initial", "incremental", "full"] = "initial") -> SyncReport:
-        """Execute a synchronization run."""
+        """Execute a synchronization run according to the specified mode."""
+        if mode == "incremental":
+            return self._run_incremental()
+        elif mode == "full":
+            return self._run_full()
+        else:
+            return self._run_initial()
+
+    def _run_initial(self) -> SyncReport:
+        """Execute full initial import."""
         started_at = self.clock.now()
         warnings: list[str] = []
         fetched_counts: dict[str, int] = {}
@@ -70,10 +98,9 @@ class AccountSync:
         updated_counts: dict[str, int] = {}
         deleted_counts: dict[str, int] = {}
 
-        # 1. Create sync run entry
         with get_db_session(self.db_engine) as session:
             sync_run = SyncRun(
-                mode=mode,
+                mode="initial",
                 status="partial",
                 started_at=started_at,
                 counts_json="{}",
@@ -86,13 +113,12 @@ class AccountSync:
         status: Literal["success", "partial", "failed", "skipped"] = "success"
 
         try:
-            # 2. Authenticate & fetch user settings
             settings = self.client.get_user_settings()
             with get_db_session(self.db_engine) as session:
                 account = upsert_account(session, settings)
                 account_id = account.id
 
-            # 3. History ingestion
+            # History
             history_items = list(self.client.drain_history())
             fetched_counts["history"] = len(history_items)
             with get_db_session(self.db_engine) as session:
@@ -100,7 +126,7 @@ class AccountSync:
                 inserted_counts["history"] = ins
                 updated_counts["history"] = upd
 
-            # 4. Ratings snapshot
+            # Ratings
             movie_ratings = self.client.get_ratings("movies")
             show_ratings = self.client.get_ratings("shows")
             ep_ratings = self.client.get_ratings("episodes")
@@ -110,7 +136,7 @@ class AccountSync:
                 ins = replace_ratings_snapshot(session, account_id, all_ratings)
                 inserted_counts["ratings"] = ins
 
-            # 5. Watchlist snapshot
+            # Watchlist
             wl_movies = self.client.get_watchlist("movies")
             wl_shows = self.client.get_watchlist("shows")
             fetched_counts["watchlist"] = len(wl_movies) + len(wl_shows)
@@ -118,7 +144,7 @@ class AccountSync:
                 ins = replace_watchlist_snapshot(session, account_id, wl_movies, wl_shows)
                 inserted_counts["watchlist"] = ins
 
-            # 6. Playback snapshot
+            # Playback
             pb_movies = self.client.get_playback("movies")
             pb_episodes = self.client.get_playback("episodes")
             fetched_counts["playback"] = len(pb_movies) + len(pb_episodes)
@@ -126,67 +152,115 @@ class AccountSync:
                 ins = replace_playback_snapshot(session, account_id, pb_movies, pb_episodes)
                 inserted_counts["playback"] = ins
 
-            # 7. Discover and hydrate relevant shows (seasons and episode catalogs)
-            show_trakt_ids: set[int] = set()
-            with get_db_session(self.db_engine) as session:
-                shows = (
-                    session.execute(
-                        select(MediaItem.trakt_id).where(MediaItem.media_type == "show")
-                    )
-                    .scalars()
-                    .all()
-                )
-                show_trakt_ids.update(shows)
+            # Catalogs
+            self._hydrate_show_catalogs(account_id, inserted_counts, updated_counts, warnings)
 
-            catalog_episodes_ins = 0
-            catalog_episodes_upd = 0
-            for trakt_id in show_trakt_ids:
-                try:
-                    seasons = self.client.get_show_seasons(trakt_id)
-                    with get_db_session(self.db_engine) as session:
-                        show_item = session.execute(
-                            select(MediaItem).where(
-                                MediaItem.media_type == "show",
-                                MediaItem.trakt_id == trakt_id,
-                            )
-                        ).scalar_one_or_none()
-                        if show_item:
-                            ins, upd = upsert_season_episodes(session, show_item.id, seasons)
-                            catalog_episodes_ins += ins
-                            catalog_episodes_upd += upd
-                except Exception as e:
-                    logger.warning("Failed to fetch season catalog for show %d: %s", trakt_id, e)
-                    warnings.append(f"Catalog error for show {trakt_id}: {type(e).__name__}")
-                    status = "partial"
-
-            inserted_counts["catalog_episodes"] = catalog_episodes_ins
-            updated_counts["catalog_episodes"] = catalog_episodes_upd
-
-            # 8. Seed local show tracking
+            # Seed tracked shows
             with get_db_session(self.db_engine) as session:
                 self._seed_tracked_shows(session, account_id)
 
-            # 9. Optional recommendation seeds
-            try:
-                rec_movies = self.client.get_recommendations("movies", limit=100)
-                rec_shows = self.client.get_recommendations("shows", limit=100)
-                with get_db_session(self.db_engine) as session:
-                    for m in rec_movies:
-                        if isinstance(m, TraktMovie):
-                            upsert_media_movie(session, m)
-                    for s in rec_shows:
-                        if isinstance(s, TraktShow):
-                            upsert_media_show(session, s)
-            except Exception as e:
-                logger.warning("Failed to fetch recommendation seeds: %s", e)
-                warnings.append(f"Recommendation seeds fetch failed: {type(e).__name__}")
-                status = "partial"
+            # Recommendation seeds
+            self._fetch_recommendation_seeds(warnings)
 
-            # 10. Update sync cursors from last_activities
-            try:
-                activities = self.client.get_last_activities()
-                now_utc = self.clock.now()
+            # Update cursors
+            self._update_all_cursors(account_id, warnings)
+
+        except Exception as e:
+            logger.error("Initial sync run %d failed: %s", run_id, e, exc_info=True)
+            status = "failed"
+            warnings.append(f"Fatal sync error: {str(e)}")
+
+        finished_at = self.clock.now()
+        with get_db_session(self.db_engine) as session:
+            sync_entry = session.get(SyncRun, run_id)
+            if sync_entry:
+                sync_entry.status = status
+                sync_entry.finished_at = finished_at
+                sync_entry.counts = {
+                    "fetched": fetched_counts,
+                    "inserted": inserted_counts,
+                    "updated": updated_counts,
+                    "deleted": deleted_counts,
+                }
+                sync_entry.warnings = warnings
+
+        return SyncReport(
+            run_id=run_id,
+            mode="initial",
+            status=status,
+            fetched=fetched_counts,
+            inserted=inserted_counts,
+            updated=updated_counts,
+            deleted=deleted_counts,
+            warnings=tuple(warnings),
+        )
+
+    def _run_incremental(self) -> SyncReport:
+        """Execute 15-minute incremental sync checking activity timestamps."""
+        started_at = self.clock.now()
+        warnings: list[str] = []
+        fetched_counts: dict[str, int] = {}
+        inserted_counts: dict[str, int] = {}
+        updated_counts: dict[str, int] = {}
+        deleted_counts: dict[str, int] = {}
+
+        with get_db_session(self.db_engine) as session:
+            account = session.get(Account, 1)
+            if account is None:
+                return self._run_initial()
+            account_id = account.id
+
+            sync_run = SyncRun(
+                mode="incremental",
+                status="partial",
+                started_at=started_at,
+                counts_json="{}",
+                warnings_json="[]",
+            )
+            session.add(sync_run)
+            session.flush()
+            run_id = sync_run.id
+
+        status: Literal["success", "partial", "failed", "skipped"] = "success"
+
+        try:
+            activities = self.client.get_last_activities()
+            now_utc = self.clock.now()
+
+            # Load existing cursors
+            with get_db_session(self.db_engine) as session:
+                cursor_rows = (
+                    session.execute(select(SyncCursor).where(SyncCursor.account_id == account_id))
+                    .scalars()
+                    .all()
+                )
+                cursors = {c.dataset: c.remote_activity_at for c in cursor_rows}
+
+            # 1. History changes (Movies or Episodes)
+            history_changed = _is_newer(
+                activities.movies.watched_at, cursors.get("movies:history")
+            ) or _is_newer(activities.episodes.watched_at, cursors.get("episodes:history"))
+
+            if history_changed:
                 with get_db_session(self.db_engine) as session:
+                    latest_watch = session.execute(
+                        select(func.max(WatchEvent.watched_at)).where(
+                            WatchEvent.account_id == account_id
+                        )
+                    ).scalar()
+
+                if latest_watch:
+                    latest_watch_utc = _ensure_utc(latest_watch)
+                    start_at = latest_watch_utc - timedelta(days=7) if latest_watch_utc else None
+                else:
+                    start_at = None
+
+                items = list(self.client.drain_history(start_at=start_at))
+                fetched_counts["history"] = len(items)
+                with get_db_session(self.db_engine) as session:
+                    ins, upd = upsert_watch_events(session, account_id, items)
+                    inserted_counts["history"] = ins
+                    updated_counts["history"] = upd
                     if activities.movies.watched_at:
                         update_sync_cursor(
                             session,
@@ -203,20 +277,29 @@ class AccountSync:
                             activities.episodes.watched_at,
                             now_utc,
                         )
+
+            # 2. Ratings changes
+            ratings_changed = (
+                _is_newer(activities.movies.rated_at, cursors.get("movies:ratings"))
+                or _is_newer(activities.shows.rated_at, cursors.get("shows:ratings"))
+                or _is_newer(activities.episodes.rated_at, cursors.get("episodes:ratings"))
+            )
+
+            if ratings_changed:
+                movie_ratings = self.client.get_ratings("movies")
+                show_ratings = self.client.get_ratings("shows")
+                ep_ratings = self.client.get_ratings("episodes")
+                all_ratings = movie_ratings + show_ratings + ep_ratings
+                fetched_counts["ratings"] = len(all_ratings)
+                with get_db_session(self.db_engine) as session:
+                    ins = replace_ratings_snapshot(session, account_id, all_ratings)
+                    inserted_counts["ratings"] = ins
                     if activities.movies.rated_at:
                         update_sync_cursor(
                             session,
                             account_id,
                             "movies:ratings",
                             activities.movies.rated_at,
-                            now_utc,
-                        )
-                    if activities.episodes.rated_at:
-                        update_sync_cursor(
-                            session,
-                            account_id,
-                            "episodes:ratings",
-                            activities.episodes.rated_at,
                             now_utc,
                         )
                     if activities.shows.rated_at:
@@ -227,6 +310,27 @@ class AccountSync:
                             activities.shows.rated_at,
                             now_utc,
                         )
+                    if activities.episodes.rated_at:
+                        update_sync_cursor(
+                            session,
+                            account_id,
+                            "episodes:ratings",
+                            activities.episodes.rated_at,
+                            now_utc,
+                        )
+
+            # 3. Watchlist changes
+            wl_changed = _is_newer(
+                activities.movies.watchlisted_at, cursors.get("movies:watchlist")
+            ) or _is_newer(activities.shows.watchlisted_at, cursors.get("shows:watchlist"))
+
+            if wl_changed:
+                wl_movies = self.client.get_watchlist("movies")
+                wl_shows = self.client.get_watchlist("shows")
+                fetched_counts["watchlist"] = len(wl_movies) + len(wl_shows)
+                with get_db_session(self.db_engine) as session:
+                    ins = replace_watchlist_snapshot(session, account_id, wl_movies, wl_shows)
+                    inserted_counts["watchlist"] = ins
                     if activities.movies.watchlisted_at:
                         update_sync_cursor(
                             session,
@@ -243,28 +347,32 @@ class AccountSync:
                             activities.shows.watchlisted_at,
                             now_utc,
                         )
-                    if activities.episodes.paused_at or activities.movies.paused_at:
-                        p_time = (
-                            activities.episodes.paused_at or activities.movies.paused_at or now_utc
-                        )
-                        update_sync_cursor(session, account_id, "playback", p_time, now_utc)
 
-                    acc = session.get(Account, account_id)
-                    if acc:
-                        acc.last_successful_sync_at = now_utc
-            except Exception as e:
-                logger.warning("Failed to update sync cursors: %s", e)
-                warnings.append(f"Activity cursor update failed: {type(e).__name__}")
-                status = "partial"
+            # 4. Playback changes
+            pb_time = activities.episodes.paused_at or activities.movies.paused_at
+            if pb_time and _is_newer(pb_time, cursors.get("playback")):
+                pb_movies = self.client.get_playback("movies")
+                pb_episodes = self.client.get_playback("episodes")
+                fetched_counts["playback"] = len(pb_movies) + len(pb_episodes)
+                with get_db_session(self.db_engine) as session:
+                    ins = replace_playback_snapshot(session, account_id, pb_movies, pb_episodes)
+                    inserted_counts["playback"] = ins
+                    update_sync_cursor(session, account_id, "playback", pb_time, now_utc)
+
+            # 5. Hydrate any new shows & seed local tracking
+            self._hydrate_show_catalogs(account_id, inserted_counts, updated_counts, warnings)
+            with get_db_session(self.db_engine) as session:
+                self._seed_tracked_shows(session, account_id)
+                acc = session.get(Account, account_id)
+                if acc:
+                    acc.last_successful_sync_at = now_utc
 
         except Exception as e:
-            logger.error("Sync run %d failed: %s", run_id, e, exc_info=True)
+            logger.error("Incremental sync run %d failed: %s", run_id, e, exc_info=True)
             status = "failed"
-            warnings.append(f"Fatal sync error: {str(e)}")
+            warnings.append(f"Fatal incremental sync error: {str(e)}")
 
         finished_at = self.clock.now()
-
-        # Update SyncRun record
         with get_db_session(self.db_engine) as session:
             sync_entry = session.get(SyncRun, run_id)
             if sync_entry:
@@ -280,7 +388,7 @@ class AccountSync:
 
         return SyncReport(
             run_id=run_id,
-            mode=mode,
+            mode="incremental",
             status=status,
             fetched=fetched_counts,
             inserted=inserted_counts,
@@ -288,6 +396,251 @@ class AccountSync:
             deleted=deleted_counts,
             warnings=tuple(warnings),
         )
+
+    def _run_full(self) -> SyncReport:
+        """Execute 7-day full reconciliation: drains all remote data and reconciles deletions."""
+        started_at = self.clock.now()
+        warnings: list[str] = []
+        fetched_counts: dict[str, int] = {}
+        inserted_counts: dict[str, int] = {}
+        updated_counts: dict[str, int] = {}
+        deleted_counts: dict[str, int] = {}
+
+        with get_db_session(self.db_engine) as session:
+            account = session.get(Account, 1)
+            if account is None:
+                return self._run_initial()
+            account_id = account.id
+
+            sync_run = SyncRun(
+                mode="full",
+                status="partial",
+                started_at=started_at,
+                counts_json="{}",
+                warnings_json="[]",
+            )
+            session.add(sync_run)
+            session.flush()
+            run_id = sync_run.id
+
+        status: Literal["success", "partial", "failed", "skipped"] = "success"
+
+        try:
+            # Full history drain & deletion reconciliation
+            remote_history = list(self.client.drain_history())
+            remote_history_ids = {h.id for h in remote_history}
+            fetched_counts["history"] = len(remote_history)
+
+            with get_db_session(self.db_engine) as session:
+                ins, upd = upsert_watch_events(session, account_id, remote_history)
+                inserted_counts["history"] = ins
+                updated_counts["history"] = upd
+
+                # Delete local history rows no longer present on Trakt
+                local_events = (
+                    session.execute(select(WatchEvent).where(WatchEvent.account_id == account_id))
+                    .scalars()
+                    .all()
+                )
+                deleted_events = 0
+                for ev in local_events:
+                    if ev.history_id not in remote_history_ids:
+                        session.delete(ev)
+                        deleted_events += 1
+                deleted_counts["history"] = deleted_events
+
+            # Full snapshots for ratings, watchlist, playback
+            movie_ratings = self.client.get_ratings("movies")
+            show_ratings = self.client.get_ratings("shows")
+            ep_ratings = self.client.get_ratings("episodes")
+            all_ratings = movie_ratings + show_ratings + ep_ratings
+            fetched_counts["ratings"] = len(all_ratings)
+            with get_db_session(self.db_engine) as session:
+                ins = replace_ratings_snapshot(session, account_id, all_ratings)
+                inserted_counts["ratings"] = ins
+
+            wl_movies = self.client.get_watchlist("movies")
+            wl_shows = self.client.get_watchlist("shows")
+            fetched_counts["watchlist"] = len(wl_movies) + len(wl_shows)
+            with get_db_session(self.db_engine) as session:
+                ins = replace_watchlist_snapshot(session, account_id, wl_movies, wl_shows)
+                inserted_counts["watchlist"] = ins
+
+            pb_movies = self.client.get_playback("movies")
+            pb_episodes = self.client.get_playback("episodes")
+            fetched_counts["playback"] = len(pb_movies) + len(pb_episodes)
+            with get_db_session(self.db_engine) as session:
+                ins = replace_playback_snapshot(session, account_id, pb_movies, pb_episodes)
+                inserted_counts["playback"] = ins
+
+            # Hydrate catalogs
+            self._hydrate_show_catalogs(account_id, inserted_counts, updated_counts, warnings)
+
+            # Seed / reconcile tracked shows (preserves manual statuses and custom pace)
+            with get_db_session(self.db_engine) as session:
+                self._seed_tracked_shows(session, account_id)
+
+            # Update all cursors
+            self._update_all_cursors(account_id, warnings)
+
+        except Exception as e:
+            logger.error("Full reconciliation run %d failed: %s", run_id, e, exc_info=True)
+            status = "failed"
+            warnings.append(f"Fatal full reconciliation error: {str(e)}")
+
+        finished_at = self.clock.now()
+        with get_db_session(self.db_engine) as session:
+            sync_entry = session.get(SyncRun, run_id)
+            if sync_entry:
+                sync_entry.status = status
+                sync_entry.finished_at = finished_at
+                sync_entry.counts = {
+                    "fetched": fetched_counts,
+                    "inserted": inserted_counts,
+                    "updated": updated_counts,
+                    "deleted": deleted_counts,
+                }
+                sync_entry.warnings = warnings
+
+        return SyncReport(
+            run_id=run_id,
+            mode="full",
+            status=status,
+            fetched=fetched_counts,
+            inserted=inserted_counts,
+            updated=updated_counts,
+            deleted=deleted_counts,
+            warnings=tuple(warnings),
+        )
+
+    def _hydrate_show_catalogs(
+        self,
+        account_id: int,
+        inserted_counts: dict[str, int],
+        updated_counts: dict[str, int],
+        warnings: list[str],
+    ) -> None:
+        """Hydrate seasons and episodes for shows present in the database."""
+        show_trakt_ids: set[int] = set()
+        with get_db_session(self.db_engine) as session:
+            shows = (
+                session.execute(select(MediaItem.trakt_id).where(MediaItem.media_type == "show"))
+                .scalars()
+                .all()
+            )
+            show_trakt_ids.update(shows)
+
+        cat_ins = 0
+        cat_upd = 0
+        for trakt_id in show_trakt_ids:
+            try:
+                seasons = self.client.get_show_seasons(trakt_id)
+                with get_db_session(self.db_engine) as session:
+                    show_item = session.execute(
+                        select(MediaItem).where(
+                            MediaItem.media_type == "show",
+                            MediaItem.trakt_id == trakt_id,
+                        )
+                    ).scalar_one_or_none()
+                    if show_item:
+                        ins, upd = upsert_season_episodes(session, show_item.id, seasons)
+                        cat_ins += ins
+                        cat_upd += upd
+            except Exception as e:
+                logger.warning("Failed to fetch season catalog for show %d: %s", trakt_id, e)
+                warnings.append(f"Catalog error for show {trakt_id}: {type(e).__name__}")
+
+        inserted_counts["catalog_episodes"] = inserted_counts.get("catalog_episodes", 0) + cat_ins
+        updated_counts["catalog_episodes"] = updated_counts.get("catalog_episodes", 0) + cat_upd
+
+    def _fetch_recommendation_seeds(self, warnings: list[str]) -> None:
+        """Fetch optional movie and show recommendation seeds."""
+        try:
+            rec_movies = self.client.get_recommendations("movies", limit=100)
+            rec_shows = self.client.get_recommendations("shows", limit=100)
+            with get_db_session(self.db_engine) as session:
+                for m in rec_movies:
+                    if isinstance(m, TraktMovie):
+                        upsert_media_movie(session, m)
+                for s in rec_shows:
+                    if isinstance(s, TraktShow):
+                        upsert_media_show(session, s)
+        except Exception as e:
+            logger.warning("Failed to fetch recommendation seeds: %s", e)
+            warnings.append(f"Recommendation seeds fetch failed: {type(e).__name__}")
+
+    def _update_all_cursors(self, account_id: int, warnings: list[str]) -> None:
+        """Fetch latest activities and advance all cursors upon committed success."""
+        try:
+            activities = self.client.get_last_activities()
+            now_utc = self.clock.now()
+            with get_db_session(self.db_engine) as session:
+                if activities.movies.watched_at:
+                    update_sync_cursor(
+                        session,
+                        account_id,
+                        "movies:history",
+                        activities.movies.watched_at,
+                        now_utc,
+                    )
+                if activities.episodes.watched_at:
+                    update_sync_cursor(
+                        session,
+                        account_id,
+                        "episodes:history",
+                        activities.episodes.watched_at,
+                        now_utc,
+                    )
+                if activities.movies.rated_at:
+                    update_sync_cursor(
+                        session,
+                        account_id,
+                        "movies:ratings",
+                        activities.movies.rated_at,
+                        now_utc,
+                    )
+                if activities.episodes.rated_at:
+                    update_sync_cursor(
+                        session,
+                        account_id,
+                        "episodes:ratings",
+                        activities.episodes.rated_at,
+                        now_utc,
+                    )
+                if activities.shows.rated_at:
+                    update_sync_cursor(
+                        session,
+                        account_id,
+                        "shows:ratings",
+                        activities.shows.rated_at,
+                        now_utc,
+                    )
+                if activities.movies.watchlisted_at:
+                    update_sync_cursor(
+                        session,
+                        account_id,
+                        "movies:watchlist",
+                        activities.movies.watchlisted_at,
+                        now_utc,
+                    )
+                if activities.shows.watchlisted_at:
+                    update_sync_cursor(
+                        session,
+                        account_id,
+                        "shows:watchlist",
+                        activities.shows.watchlisted_at,
+                        now_utc,
+                    )
+                if activities.episodes.paused_at or activities.movies.paused_at:
+                    p_time = activities.episodes.paused_at or activities.movies.paused_at or now_utc
+                    update_sync_cursor(session, account_id, "playback", p_time, now_utc)
+
+                acc = session.get(Account, account_id)
+                if acc:
+                    acc.last_successful_sync_at = now_utc
+        except Exception as e:
+            logger.warning("Failed to update sync cursors: %s", e)
+            warnings.append(f"Activity cursor update failed: {type(e).__name__}")
 
     def _seed_tracked_shows(self, session: Session, account_id: int) -> None:
         """Seed automatic local show tracking based on watch history and watchlist."""
