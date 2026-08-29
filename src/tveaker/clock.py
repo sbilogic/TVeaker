@@ -1,48 +1,42 @@
-"""Deterministic clock abstractions for TVeaker."""
+"""Clock abstraction layer for deterministic time management."""
 
+from abc import ABC, abstractmethod
 from datetime import UTC, date, datetime, timedelta
-from typing import Protocol
 
 
-class Clock(Protocol):
-    """Protocol for time sources."""
+class Clock(ABC):
+    """Abstract clock interface providing current time in UTC."""
 
+    @abstractmethod
     def now(self) -> datetime:
-        """Return the current timezone-aware UTC datetime."""
-        ...
+        """Return current datetime in UTC with timezone awareness."""
+        raise NotImplementedError
 
     def today(self) -> date:
-        """Return the current UTC date."""
-        ...
+        """Return current date in UTC."""
+        return self.now().date()
 
 
-class SystemClock:
-    """Real system clock returning UTC datetime and date."""
+class SystemClock(Clock):
+    """Production clock backed by system time."""
 
     def now(self) -> datetime:
         return datetime.now(UTC)
 
-    def today(self) -> date:
-        return datetime.now(UTC).date()
 
+class FrozenClock(Clock):
+    """Test clock that returns a fixed datetime and allows manual advancing."""
 
-class FrozenClock:
-    """Deterministic, mutable clock for testing time-dependent logic."""
-
-    def __init__(self, current_time: datetime | None = None) -> None:
-        if current_time is None:
-            self._current_time = datetime(2026, 8, 29, 12, 0, 0, tzinfo=UTC)
+    def __init__(self, initial_time: datetime | None = None) -> None:
+        if initial_time is None:
+            self._current_time = datetime.now(UTC)
+        elif initial_time.tzinfo is None:
+            self._current_time = initial_time.replace(tzinfo=UTC)
         else:
-            if current_time.tzinfo is None:
-                self._current_time = current_time.replace(tzinfo=UTC)
-            else:
-                self._current_time = current_time.astimezone(UTC)
+            self._current_time = initial_time.astimezone(UTC)
 
     def now(self) -> datetime:
         return self._current_time
-
-    def today(self) -> date:
-        return self._current_time.date()
 
     def set_time(self, new_time: datetime) -> None:
         if new_time.tzinfo is None:
@@ -50,5 +44,9 @@ class FrozenClock:
         else:
             self._current_time = new_time.astimezone(UTC)
 
-    def advance(self, delta: timedelta) -> None:
-        self._current_time += delta
+    def advance(self, delta: timedelta | int | float) -> None:
+        """Advance time by timedelta or numeric seconds."""
+        if isinstance(delta, (int, float)):
+            self._current_time += timedelta(seconds=delta)
+        else:
+            self._current_time += delta

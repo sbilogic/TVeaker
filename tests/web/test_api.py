@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, datetime
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine
@@ -20,6 +21,7 @@ from tveaker.models import (
     WatchEvent,
     WatchlistItem,
 )
+from tveaker.sync.importer import SyncReport
 from tveaker.web.app import create_app
 
 
@@ -135,6 +137,24 @@ def test_api_health(app_client):
     assert data["username"] == "sahil"
 
 
+def test_api_sync_status(app_client):
+    client, _, _ = app_client
+    res = client.get("/api/v1/sync/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "cursors" in data
+    assert "recent_runs" in data
+
+
+def test_api_sync_trigger(app_client):
+    client, _, _ = app_client
+    with patch("tveaker.sync.importer.AccountSync.run") as mock_run:
+        mock_run.return_value = SyncReport(1, "incremental", "success", {}, {}, {}, {}, [])
+        res = client.post("/api/v1/sync/trigger", json={"mode": "incremental"})
+        assert res.status_code == 200
+        assert res.json()["status"] == "success"
+
+
 def test_api_shows_list_and_patch(app_client):
     client, _, _ = app_client
 
@@ -155,6 +175,10 @@ def test_api_shows_list_and_patch(app_client):
     assert patched["status"] == "paused"
     assert patched["manual_episodes_per_week"] == 4.5
     assert patched["include_specials"] is True
+
+    # 404 for nonexistent show
+    res_404 = client.patch("/api/v1/shows/999", json={"status": "watching"})
+    assert res_404.status_code == 404
 
 
 def test_api_recommendations_and_feedback(app_client):
@@ -180,6 +204,13 @@ def test_api_recommendations_and_feedback(app_client):
     fb_data = fb_res.json()
     assert fb_data["action"] == "not_now"
     assert fb_data["candidate_id"] == candidate_id
+
+    # 404 for nonexistent run feedback
+    fb_404 = client.post(
+        "/api/v1/recommendations/feedback",
+        json={"run_id": 9999, "candidate_id": "movie:1", "action": "accepted"},
+    )
+    assert fb_404.status_code == 404
 
 
 def test_api_history(app_client):

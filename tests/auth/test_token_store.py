@@ -1,42 +1,35 @@
-"""Tests for TokenData and TokenStore implementations."""
+"""Tests for token storage and keyring adapters."""
 
-import time
+from unittest.mock import patch
 
-from tveaker.auth.token_store import MemoryTokenStore, TokenData
+from keyring.errors import KeyringError
+
+from tveaker.auth.token_store import KeyringTokenStore, MemoryTokenStore, TokenData
 
 
-def test_token_data_serialization_and_masking():
+def test_token_data_serialization():
     token = TokenData(
-        access_token="secret_access_token_12345",
-        refresh_token="secret_refresh_token_67890",
-        created_at=1000,
+        access_token="test_access_token",
+        refresh_token="test_refresh_token",
+        created_at=1700000000,
         expires_in=7200,
     )
     raw = token.to_json()
-    loaded = TokenData.from_json(raw)
-    assert loaded == token
-    assert "secret_access_token_12345" not in repr(token)
-    assert "secr...2345" in repr(token)
+    restored = TokenData.from_json(raw)
+    assert restored == token
+    assert restored.access_token == "test_access_token"
+    assert "test...oken" in repr(token)
 
 
-def test_token_expiration_buffer():
-    now = int(time.time())
-    valid_token = TokenData(
-        access_token="valid",
-        refresh_token="valid_refresh",
-        created_at=now,
-        expires_in=3600,
-    )
-    assert not valid_token.is_expired(buffer_seconds=300)
+def test_token_data_expiration():
+    now_ts = 1700005000
+    # expires at 1700000000 + 7200 = 1700007200. Buffer 300 means expires at 1700006900
+    token_valid = TokenData("a", "r", 1700000000, 7200)
+    assert not token_valid.is_expired(buffer_seconds=300, now_ts=now_ts)
 
-    expiring_soon_token = TokenData(
-        access_token="expiring",
-        refresh_token="expiring_refresh",
-        created_at=now - 3400,
-        expires_in=3600,
-    )
-    # 3600 - 3400 = 200s left, with buffer 300s it should be expired
-    assert expiring_soon_token.is_expired(buffer_seconds=300)
+    # expires at 1700000000 + 1000 = 1700001000 < 1700005000
+    token_expired = TokenData("a", "r", 1700000000, 1000)
+    assert token_expired.is_expired(buffer_seconds=300, now_ts=now_ts)
 
 
 def test_memory_token_store():
@@ -54,3 +47,26 @@ def test_memory_token_store():
 
     store.delete_token()
     assert store.get_token() is None
+
+
+def test_keyring_token_store_error_handling():
+    store = KeyringTokenStore(service_name="tveaker_test", username="test_user")
+
+    with patch("keyring.get_password", side_effect=KeyringError("Locked")):
+        assert store.get_token() is None
+
+    with (
+        patch("keyring.get_password", return_value="invalid-json"),
+        patch.object(store, "clear_token") as mock_clear,
+    ):
+        assert store.get_token() is None
+        mock_clear.assert_called_once()
+
+    with patch("keyring.set_password") as mock_set:
+        token = TokenData("acc", "ref", 100, 1000)
+        store.save_token(token)
+        mock_set.assert_called_once()
+
+    with patch("keyring.delete_password") as mock_del:
+        store.clear_token()
+        mock_del.assert_called_once()
