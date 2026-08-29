@@ -45,6 +45,14 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Android Build & Caches
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+
 # IDE
 .idea/
 .vscode/
