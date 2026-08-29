@@ -94,11 +94,17 @@ class MetadataHydrationService:
         """Fetch show metadata and embedded episodes from TVMaze API."""
         try:
             if imdb_id and imdb_id.startswith("tt"):
-                res = self.client.get(
-                    f"https://api.tvmaze.com/lookup/shows?imdb={imdb_id}&embed=episodes"
-                )
+                res = self.client.get(f"https://api.tvmaze.com/lookup/shows?imdb={imdb_id}")
                 if res.status_code == 200:
-                    return res.json()
+                    show_obj = res.json()
+                    tvm_id = show_obj.get("id")
+                    if tvm_id:
+                        res_eps = self.client.get(
+                            f"https://api.tvmaze.com/shows/{tvm_id}?embed=episodes"
+                        )
+                        if res_eps.status_code == 200:
+                            return res_eps.json()
+                    return show_obj
 
             res = self.client.get(
                 f"https://api.tvmaze.com/singlesearch/shows?q={title}&embed=episodes"
@@ -224,7 +230,7 @@ class MetadataHydrationService:
                         else:
                             new_ep = Episode(
                                 show_id=media.id,
-                                trakt_id=-(media.id * 10000 + season_num * 100 + ep_num),
+                                trakt_id=-(media.id * 1000000 + season_num * 10000 + ep_num),
                                 season_number=season_num,
                                 episode_number=ep_num,
                                 title=ep_name,
