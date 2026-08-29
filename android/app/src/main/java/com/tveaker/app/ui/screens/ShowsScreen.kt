@@ -112,13 +112,63 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                 }
             }
 
-            if (state.isLoading) {
+            if (state.isLoading && state.shows.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = AccentCyan)
                 }
+            } else if (state.errorMessage != null && state.shows.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = BgSurface),
+                        shape = RoundedCornerShape(20.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("📡 Server Connection", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = TextPrimary)
+                            Text(
+                                text = "Cannot reach backend at ${state.currentServerUrl}",
+                                fontSize = 12.sp,
+                                color = TextMuted,
+                                modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+
+                            Button(
+                                onClick = { viewModel.setServerUrl("http://192.168.1.33:8000/") },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("📱 Wi-Fi LAN (192.168.1.33:8000)", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = { viewModel.setServerUrl("http://10.0.2.2:8000/") },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("💻 Emulator (10.0.2.2:8000)", color = TextPrimary, fontSize = 12.sp)
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            TextButton(
+                                onClick = { viewModel.loadShows() }
+                            ) {
+                                Text("🔄 Retry Connection", color = AccentPurple, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
             } else if (filteredShows.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No shows match your search.", color = TextSecondary)
+                    Text("No shows found.", color = TextSecondary)
                 }
             } else {
                 LazyColumn(

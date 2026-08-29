@@ -60,9 +60,73 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
         },
         containerColor = BgBase
     ) { padding ->
-        if (state.isLoading) {
+        if (state.isLoading && state.activeShows.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = AccentCyan)
+            }
+        } else if (state.errorMessage != null && state.activeShows.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = BgSurface),
+                    shape = RoundedCornerShape(20.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("📡 Server Connection", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = TextPrimary)
+                        Text(
+                            text = "Cannot reach TVeaker backend at ${state.currentServerUrl}",
+                            fontSize = 12.sp,
+                            color = TextMuted,
+                            modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+
+                        Text(
+                            text = "Select your connection mode:",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentCyan,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        Button(
+                            onClick = { viewModel.setServerUrl("http://192.168.1.33:8000/") },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("📱 Wi-Fi LAN (192.168.1.33:8000)", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedButton(
+                            onClick = { viewModel.setServerUrl("http://10.0.2.2:8000/") },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("💻 Emulator (10.0.2.2:8000)", color = TextPrimary, fontSize = 12.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        TextButton(
+                            onClick = { viewModel.loadDashboardData() }
+                        ) {
+                            Text("🔄 Retry Connection", color = AccentPurple, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         } else {
             LazyColumn(

@@ -2,6 +2,7 @@ package com.tveaker.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tveaker.app.TVeakerApplication
 import com.tveaker.app.data.model.RecommendationItemDto
 import com.tveaker.app.data.model.ShowEstimateDto
 import com.tveaker.app.data.model.UnwatchedEpisodesResponseDto
@@ -9,6 +10,7 @@ import com.tveaker.app.data.repository.TVeakerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class DashboardUiState(
@@ -19,18 +21,31 @@ data class DashboardUiState(
     val errorMessage: String? = null,
     val isSyncing: Boolean = false,
     val selectedShowUnwatched: UnwatchedEpisodesResponseDto? = null,
-    val isEpisodesLoading: Boolean = false
+    val isEpisodesLoading: Boolean = false,
+    val currentServerUrl: String = ""
 )
 
 class DashboardViewModel(
-    private val repository: TVeakerRepository = TVeakerRepository()
+    private val repository: TVeakerRepository = TVeakerApplication.instance.repository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(DashboardUiState())
+    private val _uiState = MutableStateFlow(
+        DashboardUiState(currentServerUrl = repository.currentBaseUrl.value)
+    )
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     init {
         loadDashboardData()
+        viewModelScope.launch {
+            repository.currentBaseUrl.collectLatest { newUrl ->
+                _uiState.value = _uiState.value.copy(currentServerUrl = newUrl)
+                loadDashboardData()
+            }
+        }
+    }
+
+    fun setServerUrl(newUrl: String) {
+        repository.updateBaseUrl(newUrl)
     }
 
     fun loadDashboardData() {
@@ -40,17 +55,18 @@ class DashboardViewModel(
             val showsResult = repository.getShows("watching")
             val recResult = repository.getRecommendations(limit = 6)
 
-            if (showsResult.isSuccess && recResult.isSuccess) {
+            if (showsResult.isSuccess || recResult.isSuccess) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     activeShows = showsResult.getOrNull() ?: emptyList(),
                     recommendations = recResult.getOrNull()?.items ?: emptyList(),
-                    runId = recResult.getOrNull()?.runId
+                    runId = recResult.getOrNull()?.runId,
+                    errorMessage = null
                 )
             } else {
                 val error = showsResult.exceptionOrNull()?.message
                     ?: recResult.exceptionOrNull()?.message
-                    ?: "Failed to load dashboard data"
+                    ?: "Cannot connect to server at ${repository.currentBaseUrl.value}"
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     errorMessage = error

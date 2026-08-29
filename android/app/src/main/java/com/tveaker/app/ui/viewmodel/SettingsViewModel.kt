@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tveaker.app.BuildConfig
+import com.tveaker.app.TVeakerApplication
 import com.tveaker.app.data.model.AppVersionDto
 import com.tveaker.app.data.model.HealthDto
 import com.tveaker.app.data.repository.TVeakerRepository
@@ -18,7 +19,7 @@ import java.io.File
 data class SettingsUiState(
     val isLoading: Boolean = false,
     val health: HealthDto? = null,
-    val baseUrl: String = "http://10.0.2.2:8000/",
+    val baseUrl: String = "http://192.168.1.33:8000/",
     val syncMessage: String? = null,
     val isSyncing: Boolean = false,
     val errorMessage: String? = null,
@@ -34,10 +35,12 @@ data class SettingsUiState(
 )
 
 class SettingsViewModel(
-    private val repository: TVeakerRepository = TVeakerRepository()
+    private val repository: TVeakerRepository = TVeakerApplication.instance.repository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SettingsUiState())
+    private val _uiState = MutableStateFlow(
+        SettingsUiState(baseUrl = repository.currentBaseUrl.value)
+    )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {

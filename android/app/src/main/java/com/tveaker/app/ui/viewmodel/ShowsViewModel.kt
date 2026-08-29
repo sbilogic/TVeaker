@@ -2,6 +2,7 @@ package com.tveaker.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tveaker.app.TVeakerApplication
 import com.tveaker.app.data.model.ShowEstimateDto
 import com.tveaker.app.data.model.UnwatchedEpisodesResponseDto
 import com.tveaker.app.data.model.UpdateShowRequest
@@ -9,6 +10,7 @@ import com.tveaker.app.data.repository.TVeakerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class ShowsUiState(
@@ -17,18 +19,31 @@ data class ShowsUiState(
     val selectedStatus: String? = null,
     val errorMessage: String? = null,
     val selectedShowUnwatched: UnwatchedEpisodesResponseDto? = null,
-    val isEpisodesLoading: Boolean = false
+    val isEpisodesLoading: Boolean = false,
+    val currentServerUrl: String = ""
 )
 
 class ShowsViewModel(
-    private val repository: TVeakerRepository = TVeakerRepository()
+    private val repository: TVeakerRepository = TVeakerApplication.instance.repository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ShowsUiState())
+    private val _uiState = MutableStateFlow(
+        ShowsUiState(currentServerUrl = repository.currentBaseUrl.value)
+    )
     val uiState: StateFlow<ShowsUiState> = _uiState.asStateFlow()
 
     init {
         loadShows()
+        viewModelScope.launch {
+            repository.currentBaseUrl.collectLatest { newUrl ->
+                _uiState.value = _uiState.value.copy(currentServerUrl = newUrl)
+                loadShows()
+            }
+        }
+    }
+
+    fun setServerUrl(newUrl: String) {
+        repository.updateBaseUrl(newUrl)
     }
 
     fun setStatusFilter(status: String?) {
@@ -43,12 +58,13 @@ class ShowsViewModel(
             if (result.isSuccess) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    shows = result.getOrNull() ?: emptyList()
+                    shows = result.getOrNull() ?: emptyList(),
+                    errorMessage = null
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to load shows"
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to connect to ${repository.currentBaseUrl.value}"
                 )
             }
         }
