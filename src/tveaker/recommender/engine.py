@@ -36,6 +36,8 @@ class RecommendationItem:
     score: float
     explanation: str
     breakdown: RankingBreakdown
+    poster_url: str | None = None
+    backdrop_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -127,6 +129,8 @@ class RecommendationEngine:
                 score=b.final_score,
                 explanation=explanation,
                 breakdown=b,
+                poster_url=cand.poster_url,
+                backdrop_url=cand.backdrop_url,
             )
             final_items.append(item)
             serializable_ranks.append(

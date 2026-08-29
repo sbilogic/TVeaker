@@ -96,17 +96,12 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                     FilterChip(
                         selected = isSelected,
                         onClick = { viewModel.setStatusFilter(statusValue) },
-                        label = { Text(label, fontSize = 12.sp) },
+                        label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = BgSurface,
                             labelColor = TextSecondary,
                             selectedContainerColor = AccentCyan,
                             selectedLabelColor = BgBase
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            borderColor = if (isSelected) AccentCyan else BorderSubtle
                         )
                     )
                 }
@@ -117,20 +112,25 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                     CircularProgressIndicator(color = AccentCyan)
                 }
             } else if (state.errorMessage != null && state.shows.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = BgSurface),
                         shape = RoundedCornerShape(20.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                        modifier = Modifier.fillMaxWidth().padding(16.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
                             modifier = Modifier.padding(24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("📡 Server Connection", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = TextPrimary)
+                            Text("📡 Connection Failed", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
                             Text(
-                                text = "Cannot reach backend at ${state.currentServerUrl}",
+                                text = "Cannot reach server at ${state.currentServerUrl}",
                                 fontSize = 12.sp,
                                 color = TextMuted,
                                 modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
@@ -238,14 +238,14 @@ fun ShowDetailCard(
                             contentDescription = show.title,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(width = 40.dp, height = 60.dp)
+                                .size(width = 44.dp, height = 66.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(width = 40.dp, height = 60.dp)
+                                .size(width = 44.dp, height = 66.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(AccentCyan.copy(alpha = 0.12f))
                                 .border(1.dp, AccentCyan.copy(alpha = 0.25f), RoundedCornerShape(8.dp)),
@@ -255,7 +255,7 @@ fun ShowDetailCard(
                                 text = show.title.take(1),
                                 fontWeight = FontWeight.ExtraBold,
                                 color = AccentCyan,
-                                fontSize = 16.sp
+                                fontSize = 18.sp
                             )
                         }
                     }
@@ -279,32 +279,30 @@ fun ShowDetailCard(
                     Button(
                         onClick = { expanded = true },
                         colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(30.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            show.status.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
-                            color = AccentCyan,
+                            text = show.status.replaceFirstChar { it.uppercase() },
+                            color = if (show.status == "watching") AccentCyan else TextPrimary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
+
                     DropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false },
                         modifier = Modifier.background(BgSurfaceElevated)
                     ) {
-                        listOf("watching", "planned", "paused", "completed", "dropped").forEach { s ->
+                        val statusList = listOf("watching", "planned", "paused", "completed", "dropped")
+                        statusList.forEach { status ->
                             DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        s.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
-                                        color = TextPrimary
-                                    )
-                                },
+                                text = { Text(status.replaceFirstChar { it.uppercase() }, color = TextPrimary) },
                                 onClick = {
+                                    onStatusChange(status)
                                     expanded = false
-                                    onStatusChange(s)
                                 }
                             )
                         }
@@ -312,12 +310,12 @@ fun ShowDetailCard(
                 }
             }
 
-            // Progress bar
+            // Dual-Tone Gradient Progress Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .padding(top = 10.dp)
+                    .padding(top = 8.dp)
                     .clip(RoundedCornerShape(3.dp))
                     .background(Border)
             ) {
@@ -325,35 +323,31 @@ fun ShowDetailCard(
                     modifier = Modifier
                         .fillMaxWidth(show.completionPercent / 100f)
                         .fillMaxHeight()
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(AccentCyan, AccentIndigo)
-                            )
-                        )
+                        .background(Brush.horizontalGradient(listOf(AccentCyan, AccentIndigo)))
                 )
             }
 
-            // Progress details with remaining runtime
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${show.completionPercent}% completed",
-                    color = TextMuted,
-                    fontSize = 11.sp
-                )
-                Text(
-                    text = if (show.remainingEpisodes > 0) {
-                        "${show.remainingEpisodes} left (${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"})"
-                    } else "0 eps left",
+                    text = if (show.remainingEpisodes > 0) "${show.remainingEpisodes} episodes left (${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"})" else "✓ Caught up",
                     color = AccentCyan,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp
+                    fontSize = 10.sp
+                )
+                Text(
+                    text = "${show.completionPercent}% Complete",
+                    color = TextMuted,
+                    fontSize = 10.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -361,10 +355,10 @@ fun ShowDetailCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (show.estimatedFinishDate != null) "Target: ${show.estimatedFinishDate.substring(0, minOf(10, show.estimatedFinishDate.length))}" else if (show.isCaughtUp) "✓ Caught up" else "Status: ${show.status}",
+                    text = if (show.estimatedFinishDate != null) "Target: ${show.estimatedFinishDate.substring(0, minOf(10, show.estimatedFinishDate.length))}" else if (show.isCaughtUp) "✓ Caught up" else "In Progress",
                     color = if (show.isCaughtUp) Success else TextSecondary,
                     fontSize = 11.sp,
-                    fontWeight = if (show.isCaughtUp) FontWeight.Medium else FontWeight.Normal
+                    fontWeight = FontWeight.SemiBold
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -372,8 +366,9 @@ fun ShowDetailCard(
                         Button(
                             onClick = onQuickScrobble,
                             colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            modifier = Modifier.height(28.dp),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Text("+1 Ep", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
@@ -381,8 +376,9 @@ fun ShowDetailCard(
                     Button(
                         onClick = onOpenEpisodes,
                         colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp)
                     }

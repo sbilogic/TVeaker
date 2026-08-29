@@ -102,95 +102,72 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                                         text = state.serverVersionInfo?.changelog ?: "",
                                         color = TextSecondary,
                                         fontSize = 11.sp,
-                                        lineHeight = 14.sp,
                                         modifier = Modifier.padding(top = 4.dp)
                                     )
                                 }
-                            }
-                        }
-
-                        if (state.downloadProgress != null) {
-                            Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                                Text(
-                                    text = "Downloading APK update... ${( (state.downloadProgress ?: 0f) * 100).toInt()}%",
-                                    color = AccentCyan,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                LinearProgressIndicator(
-                                    progress = { state.downloadProgress ?: 0f },
-                                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                                    color = AccentCyan,
-                                    trackColor = Border
-                                )
-                            }
-                        } else if (state.readyToInstallApk != null) {
-                            Button(
-                                onClick = { viewModel.installUpdate(context) },
-                                colors = ButtonDefaults.buttonColors(containerColor = Success),
-                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
-                            ) {
-                                Text("Install Downloaded Update", color = BgBase, fontWeight = FontWeight.Bold)
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = { viewModel.startDownloadUpdate(context) },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (state.isNewUpdateAvailable) AccentCyan else BgSurfaceHover
-                                    ),
-                                    modifier = Modifier.weight(1f)
-                                ) {
+                                if (state.serverVersionInfo?.apkSizeBytes != null) {
+                                    val sizeMb = String.format("%.2f", (state.serverVersionInfo?.apkSizeBytes ?: 0) / 1048576f)
                                     Text(
-                                        text = if (state.isNewUpdateAvailable) "Download & Install" else "Re-download APK",
-                                        color = if (state.isNewUpdateAvailable) BgBase else TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
+                                        text = "Size: $sizeMb MB",
+                                        color = TextMuted,
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.padding(top = 2.dp)
                                     )
-                                }
-                                OutlinedButton(
-                                    onClick = { viewModel.checkForUpdates() },
-                                    modifier = Modifier.height(40.dp)
-                                ) {
-                                    Text("Check Again", color = TextSecondary, fontSize = 12.sp)
                                 }
                             }
                         }
                     } else {
                         Text(
-                            text = state.updateMessage ?: "Checking for updates...",
-                            color = TextSecondary,
-                            fontSize = 12.sp,
+                            text = "Could not reach the update server. Connect to Wi-Fi LAN to check for updates.",
+                            color = TextMuted,
+                            fontSize = 11.sp,
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
-                        OutlinedButton(
-                            onClick = { viewModel.checkForUpdates() },
-                            enabled = !state.isCheckingUpdate,
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                        ) {
-                            if (state.isCheckingUpdate) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = AccentCyan)
-                            } else {
-                                Text("Check for Updates", color = TextPrimary)
-                            }
-                        }
                     }
 
-                    if (state.errorMessage != null && state.errorMessage?.contains("update", ignoreCase = true) == true) {
-                        Text(
-                            text = state.errorMessage ?: "",
-                            color = Danger,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (state.isNewUpdateAvailable) {
+                        if (state.downloadProgress != null) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                LinearProgressIndicator(
+                                    progress = { state.downloadProgress ?: 0f },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                                    color = AccentCyan,
+                                    trackColor = Border
+                                )
+                                Text(
+                                    text = "Downloading: ${((state.downloadProgress ?: 0f) * 100).toInt()}%",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = { viewModel.startDownloadUpdate(context) },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentPurple),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().height(42.dp)
+                            ) {
+                                Text("Download & Install Update", color = TextPrimary, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = { viewModel.checkForUpdates() },
+                            colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                            modifier = Modifier.fillMaxWidth().height(42.dp)
+                        ) {
+                            Text("Check for Updates", color = TextPrimary)
+                        }
                     }
                 }
             }
 
-            // Connection & Server URL Card
+            // Connection Settings Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = BgSurface),
@@ -198,123 +175,75 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Backend Server Connection", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
-                    Text(
-                        text = "Enter your PC's IP or emulator URL to connect to the TVeaker server.",
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
-                    )
+                    Text("Connection Settings", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
+                    Text("Point the Android companion app to your TVeaker server host address.", color = TextSecondary, fontSize = 11.sp)
+
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     OutlinedTextField(
                         value = urlInput,
                         onValueChange = { urlInput = it },
+                        label = { Text("Server Base URL") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
                             focusedBorderColor = AccentCyan,
                             unfocusedBorderColor = BorderSubtle,
-                            focusedContainerColor = BgSurfaceElevated,
-                            unfocusedContainerColor = BgSurfaceElevated
+                            focusedContainerColor = BgBase,
+                            unfocusedContainerColor = BgBase
                         )
                     )
 
-                    // Quick URL Presets
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Preset connection shortcuts
+                    Text("Presets", fontSize = 11.sp, color = TextMuted, fontWeight = FontWeight.Bold)
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = {
-                                urlInput = "http://10.0.2.2:8000/"
-                                viewModel.setBaseUrl(urlInput)
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(30.dp)
-                        ) {
-                            Text("Emulator (10.0.2.2)", fontSize = 10.sp, color = TextSecondary)
-                        }
-                        OutlinedButton(
+                        Button(
                             onClick = {
                                 urlInput = "http://192.168.1.33:8000/"
-                                viewModel.setBaseUrl(urlInput)
+                                viewModel.setBaseUrl("http://192.168.1.33:8000/")
                             },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(30.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            modifier = Modifier.weight(1f).height(32.dp),
+                            shape = RoundedCornerShape(6.dp)
                         ) {
-                            Text("Wi-Fi (192.168.1.33)", fontSize = 10.sp, color = AccentCyan)
+                            Text("Wi-Fi (192.168.1.33)", color = TextPrimary, fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                urlInput = "http://10.0.2.2:8000/"
+                                viewModel.setBaseUrl("http://10.0.2.2:8000/")
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            modifier = Modifier.weight(1f).height(32.dp),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text("Emulator (10.0.2.2)", color = TextPrimary, fontSize = 11.sp)
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
                         onClick = { viewModel.setBaseUrl(urlInput) },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(42.dp)
                     ) {
-                        Text("Connect & Save URL", color = BgBase, fontWeight = FontWeight.Bold)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (state.health != null) {
-                        Text(
-                            text = "✓ Connected to TVeaker (${state.health?.username ?: "Local Database"})",
-                            color = Success,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    } else if (state.errorMessage != null) {
-                        Text(
-                            text = "Connection error: ${state.errorMessage}",
-                            color = Danger,
-                            fontSize = 12.sp
-                        )
+                        Text("Save Base URL", color = BgBase, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-
-            // Sync Triggers Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = BgSurface),
-                shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Sync Triggers", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 16.sp)
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Button(
-                        onClick = { viewModel.triggerSync("incremental") },
-                        colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
-                        enabled = !state.isSyncing,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("⚡ 15-Minute Incremental Sync", color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Button(
-                        onClick = { viewModel.triggerSync("full") },
-                        colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
-                        enabled = !state.isSyncing,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("🔄 7-Day Full Reconciliation", color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    if (state.syncMessage != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(state.syncMessage ?: "", color = Success, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }

@@ -101,7 +101,9 @@ data class RecommendationItemDto(
     @Json(name = "runtime_minutes") val runtimeMinutes: Int?,
     val score: Float,
     val explanation: String,
-    val breakdown: RecommendationRankingBreakdownDto
+    val breakdown: RecommendationRankingBreakdownDto,
+    @Json(name = "poster_url") val posterUrl: String? = null,
+    @Json(name = "backdrop_url") val backdropUrl: String? = null
 )
 
 @JsonClass(generateAdapter = true)

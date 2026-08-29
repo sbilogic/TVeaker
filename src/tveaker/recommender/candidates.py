@@ -46,6 +46,8 @@ class Candidate:
     in_progress: bool
     remaining_episodes: int | None
     progress_percent: float | None
+    poster_url: str | None = None
+    backdrop_url: str | None = None
 
 
 class CandidatePoolGenerator:
@@ -295,6 +297,8 @@ class CandidatePoolGenerator:
                         in_progress=item_data["in_progress"],
                         remaining_episodes=remaining_eps,
                         progress_percent=item_data["progress_percent"],
+                        poster_url=media.poster_url,
+                        backdrop_url=media.backdrop_url,
                     )
                 )
 

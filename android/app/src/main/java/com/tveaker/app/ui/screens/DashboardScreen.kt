@@ -8,8 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -159,7 +157,151 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                     }
                 }
 
-                // Mobile Stats Overview Ribbon
+                // Apple TV+ Style Hero Spotlight Billboard
+                if (state.activeShows.isNotEmpty()) {
+                    val heroShow = state.activeShows[0]
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderMedium),
+                            colors = CardDefaults.cardColors(containerColor = BgSurfaceElevated)
+                        ) {
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Box(
+                                    modifier = Modifier
+                                        .matchParentSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    AccentCyan.copy(alpha = 0.04f),
+                                                    AccentPurple.copy(alpha = 0.04f)
+                                                )
+                                            )
+                                        )
+                                )
+
+                                Row(
+                                    modifier = Modifier
+                                        .padding(16.dp)
+                                        .fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (!heroShow.posterUrl.isNullOrEmpty()) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(heroShow.posterUrl)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = heroShow.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(width = 72.dp, height = 108.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
+                                                .clickable { viewModel.loadUnwatchedEpisodes(heroShow.showId) }
+                                        )
+                                    }
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Surface(
+                                            color = AccentCyan.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        ) {
+                                            Text(
+                                                text = "★ IN-PROGRESS SPOTLIGHT",
+                                                color = AccentCyan,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+
+                                        Text(
+                                            text = heroShow.title,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 18.sp,
+                                            color = TextPrimary,
+                                            maxLines = 1,
+                                            modifier = Modifier.clickable { viewModel.loadUnwatchedEpisodes(heroShow.showId) }
+                                        )
+
+                                        Text(
+                                            text = "${heroShow.watchedEpisodes}/${heroShow.totalEpisodes} episodes • ${heroShow.remainingRuntimeDisplay ?: "${heroShow.unwatchedMinutes}m left"}",
+                                            color = TextSecondary,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        )
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Button(
+                                                onClick = { viewModel.quickScrobble(heroShow.showId) },
+                                                colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(28.dp),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text("+1 Ep", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                            }
+
+                                            OutlinedButton(
+                                                onClick = { viewModel.loadUnwatchedEpisodes(heroShow.showId) },
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(28.dp),
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
+                                            ) {
+                                                Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp)
+                                            }
+                                        }
+                                    }
+
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.size(64.dp)
+                                    ) {
+                                        androidx.compose.foundation.Canvas(modifier = Modifier.size(56.dp)) {
+                                            drawArc(
+                                                color = Border,
+                                                startAngle = 0f,
+                                                sweepAngle = 360f,
+                                                useCenter = false,
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5.dp.toPx())
+                                            )
+                                            drawArc(
+                                                brush = Brush.sweepGradient(listOf(AccentCyan, AccentIndigo, AccentPurple)),
+                                                startAngle = -90f,
+                                                sweepAngle = (heroShow.completionPercent / 100f) * 360f,
+                                                useCenter = false,
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                    width = 5.dp.toPx(),
+                                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                                )
+                                            )
+                                        }
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = "${heroShow.completionPercent.toInt()}%",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp,
+                                                color = TextPrimary
+                                            )
+                                            Text("Done", fontSize = 7.sp, color = TextMuted)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Stats Overview Grid
                 item {
                     val totalEpsLeft = state.activeShows.sumOf { it.remainingEpisodes }
                     val totalMins = state.activeShows.sumOf { it.unwatchedMinutes }
@@ -175,11 +317,11 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                         Card(
                             modifier = Modifier.weight(1f),
                             colors = CardDefaults.cardColors(containerColor = BgSurface),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                Text("ACTIVE SERIES", fontSize = 10.sp, color = AccentCyan, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                Text("ACTIVE SERIES", fontSize = 9.sp, color = AccentCyan, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                                 Text("${state.activeShows.size}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
                                 Text("$totalEpsLeft eps remaining", fontSize = 11.sp, color = TextMuted)
                             }
@@ -188,11 +330,11 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                         Card(
                             modifier = Modifier.weight(1f),
                             colors = CardDefaults.cardColors(containerColor = BgSurface),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(16.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                Text("REMAINING TIME", fontSize = 10.sp, color = AccentPurple, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                Text("REMAINING TIME", fontSize = 9.sp, color = AccentPurple, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                                 Text(
                                     if (totalDays > 0) "${totalDays}d ${totalHours % 24}h" else "${totalHours}h",
                                     fontSize = 22.sp,
@@ -371,7 +513,8 @@ fun ShowEstimateCard(
                             onClick = onQuickScrobble,
                             colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp)
+                            modifier = Modifier.height(28.dp),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Text("+1 Ep", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
@@ -380,7 +523,8 @@ fun ShowEstimateCard(
                         onClick = onClick,
                         colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
+                        modifier = Modifier.height(28.dp),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp)
                     }
@@ -508,7 +652,8 @@ fun UnwatchedEpisodesBottomSheet(
                                     onClick = { onWatchEpisode(ep.id) },
                                     colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                    modifier = Modifier.height(28.dp)
+                                    modifier = Modifier.height(28.dp),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text("✓ Watched", color = BgBase, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
