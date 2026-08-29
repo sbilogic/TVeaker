@@ -5,7 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, Form, HTTPException, Query, Request
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -29,6 +29,7 @@ from tveaker.models import (
 )
 from tveaker.recommender.engine import RecommendationEngine
 from tveaker.recommender.ranker import IntentType, RankingContext
+from tveaker.sync.export_importer import TraktExportImporter
 from tveaker.sync.importer import AccountSync
 from tveaker.tracking.manager import LocalShowTracker, TrackingStatus
 from tveaker.trakt.client import TraktClient
@@ -205,7 +206,11 @@ def view_history(request: Request, limit: int = 100) -> HTMLResponse:
 
 
 @ui_router.get("/settings", response_class=HTMLResponse)
-def view_settings(request: Request, error: str | None = Query(default=None)) -> HTMLResponse:
+def view_settings(
+    request: Request,
+    error: str | None = Query(default=None),
+    msg: str | None = Query(default=None),
+) -> HTMLResponse:
     db_engine: Engine = request.app.state.db_engine
     settings: Settings = request.app.state.settings
 
@@ -227,8 +232,37 @@ def view_settings(request: Request, error: str | None = Query(default=None)) -> 
             "settings": settings,
             "is_trakt_configured": settings.is_trakt_configured,
             "error": error,
+            "msg": msg,
         },
     )
+
+
+@ui_router.post("/settings/import-export")
+async def handle_import_export(
+    request: Request,
+    export_file: UploadFile | None = File(default=None),
+) -> RedirectResponse:
+    db_engine: Engine = request.app.state.db_engine
+    clock: Clock = request.app.state.clock
+    importer = TraktExportImporter(db_engine=db_engine, clock=clock)
+
+    if export_file and export_file.filename:
+        report = importer.import_zip(export_file.file)
+        return RedirectResponse(
+            url=f"/settings?msg=Export+imported+successfully!+({report.watch_events_count}+watches,+{report.shows_count}+shows)",
+            status_code=303,
+        )
+
+    # Check default folder
+    default_export = Path("exports from trakt/trakt-export-sahilbloch.zip")
+    if default_export.exists():
+        report = importer.import_zip(default_export)
+        return RedirectResponse(
+            url=f"/settings?msg=Export+imported+successfully!+({report.watch_events_count}+watches,+{report.shows_count}+shows)",
+            status_code=303,
+        )
+
+    return RedirectResponse(url="/settings?error=no_file_uploaded", status_code=303)
 
 
 @ui_router.post("/settings/credentials")

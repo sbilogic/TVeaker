@@ -33,6 +33,10 @@ data/*.db-shm
 data/*.db-journal
 data/backups/*.db
 
+# User data exports
+exports from trakt/
+*.zip
+
 # Secrets & Environment
 .env
 .env.local

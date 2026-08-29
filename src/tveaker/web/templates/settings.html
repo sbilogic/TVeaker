@@ -6,32 +6,49 @@
 <div class="header-bar">
   <div>
     <h1 class="page-title">Settings & System Doctor</h1>
-    <p style="color: var(--text-secondary); margin-top: 4px;">Manage your Trakt connection, database sync operations, and system health</p>
+    <p style="color: var(--text-secondary); margin-top: 4px;">Manage your Trakt connection, data imports, and system health</p>
   </div>
 </div>
 
-{% if error == 'missing_credentials' or not is_trakt_configured %}
+{% if msg %}
+<div class="card" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.1); margin-bottom: 24px; color: var(--success); font-weight: 600;">
+  ✓ {{ msg }}
+</div>
+{% endif %}
+
+<!-- Free Trakt Data Export Importer (No API key needed) -->
+<div class="card" style="border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.04); margin-bottom: 28px;">
+  <div style="display: flex; gap: 14px; align-items: flex-start;">
+    <span style="font-size: 1.6rem;">📦</span>
+    <div style="flex-grow: 1;">
+      <h3 style="font-size: 1.15rem; font-weight: 600; color: var(--accent); margin-bottom: 4px;">
+        100% Free Trakt Data Import (No VIP / No API Keys Required)
+      </h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;">
+        Upload your Trakt GDPR / Account export ZIP archive to immediately import all your watched history, movies, show episodes, ratings, and watchlists.
+      </p>
+
+      <form method="POST" action="/settings/import-export" enctype="multipart/form-data" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+        <input type="file" name="export_file" accept=".zip" style="font-size: 0.85rem; color: var(--text-secondary);" />
+        <button type="submit" class="btn btn-primary" style="font-weight: 700;">
+          📥 Import Trakt Export (.zip)
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if error == 'missing_credentials' %}
 <div class="card" style="border-color: rgba(245, 158, 11, 0.5); background: rgba(245, 158, 11, 0.05); margin-bottom: 24px;">
   <div style="display: flex; gap: 12px; align-items: flex-start;">
     <span style="font-size: 1.5rem;">⚠️</span>
     <div style="flex-grow: 1;">
       <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--warning); margin-bottom: 6px;">
-        Trakt API Application Setup Required
+        Optional: Trakt OAuth API Configuration
       </h3>
       <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
-        To synchronize your watch history and ratings, you must register a free application on Trakt.tv.
+        If you have existing VIP or an approved Trakt developer app, enter your credentials below. Otherwise, use the free <strong>Trakt Data Import</strong> above.
       </p>
-
-      <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-size: 0.85rem; margin-bottom: 16px;">
-        <ol style="margin-left: 20px; color: var(--text-secondary); line-height: 1.6;">
-          <li>Visit <a href="https://trakt.tv/oauth/applications" target="_blank" style="color: var(--accent); font-weight: 600;">trakt.tv/oauth/applications</a> (login or sign up).</li>
-          <li>Click <strong>"New Application"</strong>.</li>
-          <li>Set <strong>Name</strong>: <code>TVeaker</code></li>
-          <li>Set <strong>Redirect URI</strong>: <code>http://127.0.0.1:8000/auth/trakt/callback</code></li>
-          <li>Set <strong>Javascript (cors) origins</strong>: <code>http://127.0.0.1:8000</code></li>
-          <li>Click <strong>"Save App"</strong> and copy your <strong>Client ID</strong> and <strong>Client Secret</strong> below:</li>
-        </ol>
-      </div>
 
       <form method="POST" action="/settings/credentials" style="display: grid; gap: 12px; max-width: 600px;">
         <div>
@@ -82,7 +99,7 @@
         </form>
       {% else %}
         <p style="color: var(--text-secondary); margin-bottom: 16px;">No Trakt account connected yet.</p>
-        <a href="/auth/login" class="btn btn-primary" style="width: 100%;">Connect Trakt Account</a>
+        <a href="/auth/login" class="btn btn-primary" style="width: 100%;">Connect Trakt OAuth</a>
       {% endif %}
     </div>
   </div>

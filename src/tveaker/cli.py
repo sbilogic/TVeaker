@@ -22,6 +22,7 @@ from tveaker.models import (
 from tveaker.recommender.engine import RecommendationEngine
 from tveaker.recommender.ranker import RankingContext
 from tveaker.scheduler import SyncScheduler
+from tveaker.sync.export_importer import TraktExportImporter
 from tveaker.sync.importer import AccountSync
 from tveaker.trakt.client import TraktClient
 
@@ -61,7 +62,7 @@ def doctor() -> None:
         status = "EXPIRED" if expired else "VALID"
         click.echo(f"  [Trakt OAuth Token]   : {status} (Expires in: {token.expires_in}s)")
     else:
-        click.echo("  [Trakt OAuth Token]   : NOT FOUND (Run login to authenticate)")
+        click.echo("  [Trakt OAuth Token]   : NOT FOUND (Run login or upload export)")
 
     # 3. Table Counts
     try:
@@ -89,6 +90,29 @@ def doctor() -> None:
     except Exception as e:
         click.echo(f"  [Database Catalog]    : ERROR: {e}")
 
+    click.echo("========================================")
+
+
+@cli.command("import-export")
+@click.argument("zip_path", type=click.Path(exists=True))
+def import_export(zip_path: str) -> None:
+    """Import data from a Trakt GDPR/Account export ZIP file."""
+    settings = get_settings()
+    engine = create_db_engine(settings.database_url)
+    importer = TraktExportImporter(db_engine=engine)
+
+    click.echo(f"Importing Trakt export from {zip_path}...")
+    report = importer.import_zip(zip_path)
+
+    click.echo("========================================")
+    click.echo(f" Trakt Export Imported for @{report.account_username}")
+    click.echo("========================================")
+    click.echo(f"  [Shows]          : {report.shows_count}")
+    click.echo(f"  [Movies]         : {report.movies_count}")
+    click.echo(f"  [Episodes]       : {report.episodes_count}")
+    click.echo(f"  [Watch Events]   : {report.watch_events_count}")
+    click.echo(f"  [Watchlist Items]: {report.watchlist_count}")
+    click.echo(f"  [Ratings]        : {report.ratings_count}")
     click.echo("========================================")
 
 
@@ -139,10 +163,10 @@ def recommend(budget: int | None, intent: str, limit: int) -> None:
     click.echo(f"\nRecommendations (Run #{result.run_id}):")
     click.echo("-" * 70)
     for idx, item in enumerate(result.items, 1):
-        rt = f"{item.runtime_minutes}m" if item.runtime_minutes else "—"
+        rt = f"{item.runtime_minutes}m" if item.runtime_minutes else "n/a"
         pct = int(item.score * 100)
         click.echo(f"{idx}. {item.title} [{item.media_type.upper()}] ({rt}) - {pct}% match")
-        click.echo(f"   💡 {item.explanation}")
+        click.echo(f"   Reason: {item.explanation}")
     click.echo("-" * 70)
 
 
