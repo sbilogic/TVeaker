@@ -262,15 +262,17 @@ class TraktExportImporter:
                                 slug=m_raw.get("ids", {}).get("slug"),
                                 updated_at=w_at,
                             )
-                            we = WatchEvent(
-                                history_id=hid,
-                                account_id=1,
-                                movie_id=m_id,
-                                watched_at=w_at,
-                                action=action,
-                            )
-                            session.add(we)
-                            watch_events_added += 1
+                            existing_we = session.get(WatchEvent, hid)
+                            if not existing_we:
+                                we = WatchEvent(
+                                    history_id=hid,
+                                    account_id=1,
+                                    movie_id=m_id,
+                                    watched_at=w_at,
+                                    action=action,
+                                )
+                                session.add(we)
+                                watch_events_added += 1
 
                         elif w_type == "episode" and "show" in item and "episode" in item:
                             s_raw = item["show"]
@@ -289,29 +291,48 @@ class TraktExportImporter:
                             )
 
                             ep_trakt_id = ep_raw["ids"]["trakt"]
+                            season_num = ep_raw.get("season", 1)
+                            ep_num = ep_raw.get("number", 1)
+
                             stmt = select(Episode).where(Episode.trakt_id == ep_trakt_id)
                             ep_record = session.execute(stmt).scalar_one_or_none()
 
                             if not ep_record:
-                                ep_record = Episode(
-                                    show_id=s_id,
-                                    trakt_id=ep_trakt_id,
-                                    season_number=ep_raw.get("season", 1),
-                                    episode_number=ep_raw.get("number", 1),
-                                    title=ep_raw.get("title", ""),
+                                stmt_coord = select(Episode).where(
+                                    Episode.show_id == s_id,
+                                    Episode.season_number == season_num,
+                                    Episode.episode_number == ep_num,
                                 )
-                                session.add(ep_record)
-                                session.flush()
+                                ep_record = session.execute(stmt_coord).scalar_one_or_none()
+                                if ep_record:
+                                    ep_record.trakt_id = ep_trakt_id
+                                    if ep_raw.get("title") and (
+                                        not ep_record.title
+                                        or ep_record.title.startswith("Episode ")
+                                    ):
+                                        ep_record.title = ep_raw.get("title")
+                                else:
+                                    ep_record = Episode(
+                                        show_id=s_id,
+                                        trakt_id=ep_trakt_id,
+                                        season_number=season_num,
+                                        episode_number=ep_num,
+                                        title=ep_raw.get("title", ""),
+                                    )
+                                    session.add(ep_record)
+                                    session.flush()
 
-                            we = WatchEvent(
-                                history_id=hid,
-                                account_id=1,
-                                episode_id=ep_record.id,
-                                watched_at=w_at,
-                                action=action,
-                            )
-                            session.add(we)
-                            watch_events_added += 1
+                            existing_we = session.get(WatchEvent, hid)
+                            if not existing_we:
+                                we = WatchEvent(
+                                    history_id=hid,
+                                    account_id=1,
+                                    episode_id=ep_record.id,
+                                    watched_at=w_at,
+                                    action=action,
+                                )
+                                session.add(we)
+                                watch_events_added += 1
 
                     session.flush()
 
@@ -328,50 +349,51 @@ class TraktExportImporter:
                     continue
 
                 with get_db_session(self.db_engine) as session:
-                    for entry in items:
-                        s_raw = entry.get("show")
-                        if not s_raw:
+                    for ws_item in items:
+                        s_raw = ws_item.get("show")
+                        if not s_raw or "ids" not in s_raw or "trakt" not in s_raw["ids"]:
                             continue
+
+                        s_trakt_id = s_raw["ids"]["trakt"]
                         s_id = upsert_export_media(
                             session,
                             media_type="show",
-                            trakt_id=s_raw["ids"]["trakt"],
-                            title=s_raw["title"],
+                            trakt_id=s_trakt_id,
+                            title=s_raw.get("title", "Unknown Show"),
                             year=s_raw.get("year"),
                             imdb_id=s_raw.get("ids", {}).get("imdb"),
                             tmdb_id=s_raw.get("ids", {}).get("tmdb"),
                             slug=s_raw.get("ids", {}).get("slug"),
-                            updated_at=now,
+                            updated_at=parse_export_datetime(ws_item.get("last_updated_at")) or now,
                         )
 
-                        # Hydrate placeholder episodes if total aired episodes > tracked episodes
-                        aired_episodes = s_raw.get("aired_episodes")
-                        if aired_episodes and isinstance(aired_episodes, int):
-                            existing_eps = (
+                        aired_episodes = s_raw.get("aired_episodes", 0)
+                        if aired_episodes > 0:
+                            existing_coords = set(
                                 session.execute(
-                                    select(Episode).where(
+                                    select(Episode.season_number, Episode.episode_number).where(
                                         Episode.show_id == s_id, Episode.season_number > 0
                                     )
-                                )
-                                .scalars()
-                                .all()
+                                ).all()
                             )
-                            existing_count = len(existing_eps)
+                            existing_count = len(existing_coords)
                             if existing_count < aired_episodes:
                                 diff = aired_episodes - existing_count
+                                max_ep_s1 = max(
+                                    [ep_num for s_num, ep_num in existing_coords if s_num == 1]
+                                    or [0]
+                                )
                                 for i in range(1, diff + 1):
-                                    virtual_ep_trakt_id = -(s_id * 10000 + existing_count + i)
-                                    # Check uniqueness
-                                    check_stmt = select(Episode).where(
-                                        Episode.trakt_id == virtual_ep_trakt_id
-                                    )
-                                    if not session.execute(check_stmt).scalar_one_or_none():
+                                    target_ep_num = max_ep_s1 + i
+                                    virtual_ep_trakt_id = -(s_id * 100000 + target_ep_num)
+                                    if (1, target_ep_num) not in existing_coords:
+                                        existing_coords.add((1, target_ep_num))
                                         placeholder_ep = Episode(
                                             show_id=s_id,
                                             trakt_id=virtual_ep_trakt_id,
                                             season_number=1,
-                                            episode_number=existing_count + i,
-                                            title=f"Episode {existing_count + i}",
+                                            episode_number=target_ep_num,
+                                            title=f"Episode {target_ep_num}",
                                         )
                                         session.add(placeholder_ep)
 
