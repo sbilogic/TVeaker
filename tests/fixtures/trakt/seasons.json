@@ -1,0 +1,46 @@
+[
+  {
+    "number": 0,
+    "ids": { "trakt": 3959 },
+    "episodes": [
+      {
+        "season": 0,
+        "number": 1,
+        "title": "Good Cop / Bad Cop",
+        "ids": { "trakt": 73545 },
+        "runtime": 3,
+        "first_aired": "2009-02-17T00:00:00.000Z"
+      }
+    ]
+  },
+  {
+    "number": 1,
+    "ids": { "trakt": 3960 },
+    "episodes": [
+      {
+        "season": 1,
+        "number": 1,
+        "title": "Pilot",
+        "ids": { "trakt": 73482 },
+        "runtime": 58,
+        "first_aired": "2008-01-20T00:00:00.000Z"
+      },
+      {
+        "season": 1,
+        "number": 2,
+        "title": "Cat's in the Bag...",
+        "ids": { "trakt": 73483 },
+        "runtime": 48,
+        "first_aired": "2008-01-27T00:00:00.000Z"
+      },
+      {
+        "season": 1,
+        "number": 3,
+        "title": "...And the Bag's in the River",
+        "ids": { "trakt": 73484 },
+        "runtime": 48,
+        "first_aired": "2008-02-10T00:00:00.000Z"
+      }
+    ]
+  }
+]

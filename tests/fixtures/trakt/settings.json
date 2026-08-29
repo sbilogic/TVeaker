@@ -1,0 +1,15 @@
+{
+  "user": {
+    "username": "sahil",
+    "name": "Sahil",
+    "ids": {
+      "slug": "sahil",
+      "uuid": "4c98f98a-2c89-4e78-bc4a-67a6d892d19f"
+    }
+  },
+  "account": {
+    "timezone": "America/New_York",
+    "date_format": "mdy",
+    "time_24hr": false
+  }
+}
