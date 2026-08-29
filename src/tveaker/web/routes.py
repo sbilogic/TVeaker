@@ -5,15 +5,16 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine, desc, select
 
 from tveaker.auth.token_store import TokenStore
-from tveaker.auth.trakt_oauth import TraktOAuth
+from tveaker.auth.trakt_oauth import TraktOAuth, TraktOAuthError
 from tveaker.clock import Clock
+from tveaker.config import Settings
 from tveaker.db import get_db_session
 from tveaker.estimator.estimator import ShowFinishEstimator
 from tveaker.models import (
@@ -30,6 +31,7 @@ from tveaker.recommender.engine import RecommendationEngine
 from tveaker.recommender.ranker import IntentType, RankingContext
 from tveaker.sync.importer import AccountSync
 from tveaker.tracking.manager import LocalShowTracker, TrackingStatus
+from tveaker.trakt.client import TraktClient
 
 logger = logging.getLogger(__name__)
 
@@ -203,8 +205,9 @@ def view_history(request: Request, limit: int = 100) -> HTMLResponse:
 
 
 @ui_router.get("/settings", response_class=HTMLResponse)
-def view_settings(request: Request) -> HTMLResponse:
+def view_settings(request: Request, error: str | None = Query(default=None)) -> HTMLResponse:
     db_engine: Engine = request.app.state.db_engine
+    settings: Settings = request.app.state.settings
 
     with get_db_session(db_engine) as session:
         account = session.get(Account, 1)
@@ -221,23 +224,74 @@ def view_settings(request: Request) -> HTMLResponse:
             "active_page": "settings",
             "account": account,
             "sync_runs": sync_runs,
+            "settings": settings,
+            "is_trakt_configured": settings.is_trakt_configured,
+            "error": error,
         },
     )
+
+
+@ui_router.post("/settings/credentials")
+def update_credentials(
+    request: Request,
+    client_id: str = Form(...),
+    client_secret: str = Form(...),
+    redirect_uri: str = Form("http://127.0.0.1:8000/auth/trakt/callback"),
+) -> RedirectResponse:
+    settings: Settings = request.app.state.settings
+    settings.trakt_client_id = client_id.strip()
+    settings.trakt_client_secret = client_secret.strip()
+    settings.trakt_redirect_uri = redirect_uri.strip()
+
+    # Persist to .env file
+    env_path = Path(".env")
+    env_content = (
+        f"TRAKT_CLIENT_ID={settings.trakt_client_id}\n"
+        f"TRAKT_CLIENT_SECRET={settings.trakt_client_secret}\n"
+        f"TRAKT_REDIRECT_URI={settings.trakt_redirect_uri}\n"
+    )
+    env_path.write_text(env_content, encoding="utf-8")
+
+    # Refresh OAuth & Client instances
+    token_store: TokenStore = request.app.state.token_store
+    new_oauth = TraktOAuth(settings=settings, token_store=token_store)
+    new_client = TraktClient(settings=settings, token_store=token_store, oauth=new_oauth)
+    new_sync = AccountSync(
+        db_engine=request.app.state.db_engine,
+        trakt_client=new_client,
+        clock=request.app.state.clock,
+    )
+
+    request.app.state.trakt_oauth = new_oauth
+    request.app.state.trakt_client = new_client
+    request.app.state.account_sync = new_sync
+
+    return RedirectResponse(url="/auth/login", status_code=303)
 
 
 # ---------------------------------------------------------
 # Auth Routes
 # ---------------------------------------------------------
 @ui_router.get("/auth/login")
+@ui_router.get("/auth/trakt/login")
 def auth_login(request: Request) -> RedirectResponse:
     oauth: TraktOAuth = request.app.state.trakt_oauth
-    auth_url, state = oauth.get_authorization_url()
-    request.session["oauth_state"] = state
-    return RedirectResponse(auth_url)
+    if not oauth.settings.is_trakt_configured:
+        return RedirectResponse(url="/settings?error=missing_credentials", status_code=303)
+
+    try:
+        auth_url, state = oauth.get_authorization_url()
+        request.session["oauth_state"] = state
+        return RedirectResponse(auth_url)
+    except TraktOAuthError:
+        return RedirectResponse(url="/settings?error=missing_credentials", status_code=303)
 
 
 @ui_router.get("/auth/callback")
-def auth_callback(request: Request, code: str, state: str | None = None) -> RedirectResponse:
+@ui_router.get("/auth/trakt/callback")
+def auth_callback(
+    request: Request, code: str = Query(default=""), state: str | None = Query(default=None)
+) -> RedirectResponse:
     oauth: TraktOAuth = request.app.state.trakt_oauth
     expected_state = request.session.get("oauth_state")
 
@@ -256,6 +310,13 @@ def auth_callback(request: Request, code: str, state: str | None = None) -> Redi
         logger.error("Initial sync on login failed: %s", e)
 
     return RedirectResponse(url="/", status_code=303)
+
+
+@ui_router.post("/auth/disconnect")
+def auth_disconnect(request: Request) -> RedirectResponse:
+    oauth: TraktOAuth = request.app.state.trakt_oauth
+    oauth.disconnect()
+    return RedirectResponse(url="/settings", status_code=303)
 
 
 # ---------------------------------------------------------
