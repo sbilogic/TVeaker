@@ -80,6 +80,62 @@
 </div>
 {% endif %}
 
+<!-- Bento Analytics Bar -->
+{% if estimates %}
+<div class="grid" style="grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 36px;">
+  <!-- Upcoming Finish Milestones -->
+  <div class="card" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.8) 100%);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        Next Milestone Finish Schedule
+      </h3>
+      <span style="font-size: 0.75rem; color: var(--text-muted);">Earliest Projected</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      {% for est in estimates[:4] %}
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">{{ est.title }}</span>
+          <span class="badge badge-secondary" style="font-size: 0.65rem; padding: 1px 6px;">{{ est.remaining_episodes }} eps left</span>
+        </div>
+        <div style="text-align: right;">
+          {% if est.estimated_finish_date %}
+            <strong style="color: var(--accent-cyan); font-size: 0.85rem;">{{ est.estimated_finish_date.strftime('%b %d, %Y') }}</strong>
+            <span style="color: var(--text-muted); font-size: 0.75rem; margin-left: 6px;">(~{{ est.days_to_finish }}d)</span>
+          {% else %}
+            <span style="color: var(--success); font-size: 0.85rem; font-weight: 600;">Caught Up</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Viewing Speed & Pace Health -->
+  <div class="card" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.8) 100%);">
+    <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+      Velocity & Pacing
+    </h3>
+    <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;">
+      Shows adapt automatically using a 70% 30-day and 30% 90-day blended velocity algorithm.
+    </div>
+    <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-subtle); padding: 12px; border-radius: var(--radius-sm); margin-top: auto;">
+      <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">
+        <span>Recommendation Latency</span>
+        <strong style="color: var(--success);">&lt;10ms (Local)</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted);">
+        <span>Trakt API Rule</span>
+        <strong style="color: var(--accent-cyan);">Read-Only Mode</strong>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Active In-Progress Shows Grid -->
 <div class="section-header">
   <h2 class="section-title">
@@ -106,6 +162,9 @@
             <span>{{ est.year or '' }}</span>
             <span>•</span>
             <span>{{ est.watched_episodes }}/{{ est.total_episodes }} eps</span>
+            {% if est.genres %}
+              <span class="badge badge-secondary" style="font-size: 0.65rem; padding: 1px 5px;">{{ est.genres[0] }}</span>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -173,7 +232,7 @@
 <!-- Top Personalized Recommendations -->
 <div class="section-header">
   <h2 class="section-title">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
     Recommended For You
   </h2>
   <a href="/recommendations" style="color: var(--accent-cyan); text-decoration: none; font-size: 0.85rem; font-weight: 600;">

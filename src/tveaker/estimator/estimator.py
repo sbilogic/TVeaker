@@ -1,7 +1,7 @@
 """Show finish date and catch-up estimation engine."""
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Protocol
 
@@ -39,6 +39,7 @@ class ShowEstimate:
     days_to_finish: int | None
     is_caught_up: bool
     next_air_date: datetime | None
+    genres: list[str] = field(default_factory=list)
 
 
 class FinishEstimator(Protocol):
@@ -138,6 +139,7 @@ class ShowFinishEstimator:
                 days_to_finish=days_to_finish,
                 is_caught_up=is_caught_up,
                 next_air_date=counts.next_air_date,
+                genres=media.genres,
             )
 
     def estimate_all(self, status: str | None = None) -> list[ShowEstimate]:

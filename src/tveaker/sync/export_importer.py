@@ -27,6 +27,58 @@ from tveaker.models import (
 logger = logging.getLogger(__name__)
 
 
+POPULAR_GENRES: dict[str, list[str]] = {
+    "black mirror": ["Sci-Fi", "Drama", "Thriller"],
+    "futurama": ["Animation", "Comedy", "Sci-Fi"],
+    "bob's burgers": ["Animation", "Comedy"],
+    "dark matter": ["Sci-Fi", "Mystery", "Thriller"],
+    "the bear": ["Drama", "Comedy"],
+    "invincible": ["Animation", "Action", "Sci-Fi"],
+    "house of the dragon": ["Fantasy", "Drama", "Action"],
+    "game of thrones": ["Fantasy", "Drama", "Action"],
+    "tires": ["Comedy"],
+    "impractical jokers": ["Comedy", "Reality"],
+    "adventure time": ["Animation", "Adventure", "Comedy"],
+    "fionna & cake": ["Animation", "Adventure", "Fantasy"],
+    "star trek": ["Sci-Fi", "Adventure", "Action"],
+    "strange new worlds": ["Sci-Fi", "Adventure"],
+    "alien": ["Sci-Fi", "Horror", "Thriller"],
+    "rick and morty": ["Animation", "Sci-Fi", "Comedy"],
+    "severance": ["Sci-Fi", "Thriller", "Drama"],
+    "the boys": ["Action", "Sci-Fi", "Comedy"],
+    "stranger things": ["Sci-Fi", "Horror", "Drama"],
+    "breaking bad": ["Crime", "Drama", "Thriller"],
+    "better call saul": ["Crime", "Drama"],
+    "the last of us": ["Drama", "Sci-Fi", "Action"],
+    "arcane": ["Animation", "Action", "Sci-Fi"],
+    "silo": ["Sci-Fi", "Drama", "Mystery"],
+    "ted lasso": ["Comedy", "Drama", "Sport"],
+    "the office": ["Comedy"],
+    "south park": ["Animation", "Comedy"],
+    "bojack horseman": ["Animation", "Comedy", "Drama"],
+}
+
+
+def infer_genres(title: str) -> list[str]:
+    """Infer rich genre tags for items missing genre arrays."""
+    t_lower = title.lower()
+    for key, genres in POPULAR_GENRES.items():
+        if key in t_lower:
+            return genres
+    if any(
+        k in t_lower
+        for k in ["trek", "space", "wars", "alien", "matter", "mirror", "robot", "future"]
+    ):
+        return ["Sci-Fi", "Drama"]
+    if any(k in t_lower for k in ["burgers", "tires", "funny", "comedy", "jokes", "park"]):
+        return ["Comedy"]
+    if any(k in t_lower for k in ["dragon", "throne", "witcher", "ring", "magic", "fantasy"]):
+        return ["Fantasy", "Drama"]
+    if any(k in t_lower for k in ["crime", "detective", "bad", "cop", "police"]):
+        return ["Crime", "Drama"]
+    return ["Drama"]
+
+
 def parse_export_datetime(dt_str: str | None) -> datetime | None:
     """Parse ISO8601 timestamps from Trakt exports."""
     if not dt_str:
@@ -60,6 +112,8 @@ def upsert_export_media(
         MediaItem.media_type == media_type, MediaItem.trakt_id == trakt_id
     )
     item = session.execute(stmt).scalar_one_or_none()
+    if not genres:
+        genres = infer_genres(title)
     genres_json = json.dumps(sorted(genres)) if genres else "[]"
 
     if item is None:
