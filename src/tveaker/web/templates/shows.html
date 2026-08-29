@@ -32,7 +32,7 @@
       <circle cx="11" cy="11" r="8"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
-    <input type="text" id="shows-search-input" class="search-input" placeholder="Search shows by title..." />
+    <input type="text" id="shows-search-input" class="search-input" placeholder="Search shows by title (press '/' to focus)..." />
   </div>
 </div>
 
@@ -43,12 +43,12 @@
       <tr>
         <th>Show & Details</th>
         <th>Completion Progress</th>
-        <th>Remaining Watch Time</th>
+        <th>Remaining Time</th>
         <th>Status</th>
         <th>Estimated Finish</th>
         <th>Velocity (Eps/Wk)</th>
         <th>Specials</th>
-        <th>Links</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -56,7 +56,7 @@
       <tr>
         <td>
           <div style="display: flex; gap: 12px; align-items: center;">
-            <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--accent-cyan); font-size: 0.95rem; flex-shrink: 0;">
+            <div style="width: 38px; height: 38px; border-radius: var(--radius-sm); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--accent-cyan); font-size: 1rem; flex-shrink: 0;">
               {{ show.title[:1] }}
             </div>
             <div>
@@ -110,8 +110,8 @@
         <td>
           <div style="display: flex; align-items: center; gap: 8px;">
             <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.85rem;">{{ show.episodes_per_week }}</span>
-            <button class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;" onclick="updateShowPace({{ show.show_id }}, {{ show.episodes_per_week }})">
-              ✏️ Set
+            <button class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openPaceModal({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}', {{ show.episodes_per_week }}, {{ show.remaining_episodes }})">
+              ✏️ Adjust
             </button>
           </div>
         </td>
@@ -121,9 +121,16 @@
           </button>
         </td>
         <td>
-          <a href="https://trakt.tv/shows/{{ show.trakt_id }}" target="_blank" class="btn btn-sm btn-secondary" style="font-size: 0.75rem; padding: 3px 8px;">
-            Trakt ↗
-          </a>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            {% if show.remaining_episodes > 0 %}
+              <button class="btn btn-sm btn-primary" style="font-size: 0.75rem; padding: 3px 8px; font-weight: 700;" onclick="quickScrobble({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
+                +1 Ep
+              </button>
+            {% endif %}
+            <a href="https://trakt.tv/shows/{{ show.trakt_id }}" target="_blank" class="btn btn-sm btn-secondary" style="font-size: 0.75rem; padding: 3px 8px;">
+              Trakt ↗
+            </a>
+          </div>
         </td>
       </tr>
       {% else %}

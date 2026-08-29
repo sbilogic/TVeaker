@@ -97,7 +97,7 @@
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
       <div style="display: flex; gap: 12px; align-items: center;">
-        <div style="width: 42px; height: 42px; border-radius: var(--radius-md); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; color: var(--accent-cyan); flex-shrink: 0;">
+        <div style="width: 44px; height: 44px; border-radius: var(--radius-md); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; color: var(--accent-cyan); flex-shrink: 0; box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);">
           {{ est.title[:1] }}
         </div>
         <div>
@@ -132,28 +132,34 @@
       </span>
     </div>
 
-    <!-- Estimated Finish Footer -->
+    <!-- Estimated Finish Footer & Quick Actions -->
     <div style="margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-subtle); font-size: 0.85rem;">
       {% if est.estimated_finish_date %}
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <span style="color: var(--text-secondary);">Target Finish:</span>
           <strong style="color: var(--accent-cyan); font-weight: 700;">{{ est.estimated_finish_date.strftime('%b %d, %Y') }}</strong>
         </div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--text-muted);">
+        <div style="display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--text-muted); margin-bottom: 12px;">
           <span>{{ est.episodes_per_week }} eps/wk ({{ est.avg_runtime_minutes }}m avg)</span>
-          <span>~{{ est.days_to_finish }} days</span>
+          <span>~{{ est.days_to_finish }} days left</span>
         </div>
       {% else %}
-        <div style="color: var(--success); font-weight: 600; display: flex; align-items: center; gap: 6px;">
+        <div style="color: var(--success); font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 12px;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
           Up to date with all aired episodes
         </div>
-        {% if est.next_air_date %}
-          <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px;">
-            Next episode: {{ est.next_air_date.strftime('%b %d, %Y') }}
-          </div>
-        {% endif %}
       {% endif %}
+
+      <div style="display: flex; gap: 8px;">
+        {% if est.remaining_episodes > 0 %}
+          <button class="btn btn-sm btn-primary" style="flex: 1; font-weight: 700; font-size: 0.8rem;" onclick="quickScrobble({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}')">
+            +1 Ep Watched
+          </button>
+        {% endif %}
+        <button class="btn btn-sm btn-secondary" style="font-size: 0.8rem;" onclick="openPaceModal({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}', {{ est.episodes_per_week }}, {{ est.remaining_episodes }})">
+          ✏️ Pace
+        </button>
+      </div>
     </div>
   </div>
   {% endfor %}

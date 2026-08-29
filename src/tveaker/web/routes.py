@@ -468,6 +468,72 @@ def api_update_show(request: Request, show_id: int, payload: UpdateShowRequest) 
     return asdict(show)
 
 
+@api_router.post("/shows/{show_id}/quick-scrobble")
+def api_quick_scrobble(request: Request, show_id: int) -> dict[str, Any]:
+    """Mark the next unwatched episode of a show as watched locally."""
+    db_engine: Engine = request.app.state.db_engine
+    clock: Clock = request.app.state.clock
+    now = clock.now()
+
+    with get_db_session(db_engine) as session:
+        watched_ep_ids = set(
+            session.execute(
+                select(WatchEvent.episode_id)
+                .join(Episode, WatchEvent.episode_id == Episode.id)
+                .where(
+                    WatchEvent.account_id == 1,
+                    Episode.show_id == show_id,
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        unwatched_ep = (
+            session.execute(
+                select(Episode)
+                .where(
+                    Episode.show_id == show_id,
+                    Episode.season_number > 0,
+                    Episode.id.not_in(watched_ep_ids),
+                )
+                .order_by(Episode.season_number.asc(), Episode.episode_number.asc())
+            )
+            .scalars()
+            .first()
+        )
+
+        if unwatched_ep is None:
+            raise HTTPException(
+                status_code=400, detail="No unwatched episodes remaining for this show."
+            )
+
+        event = WatchEvent(
+            account_id=1,
+            episode_id=unwatched_ep.id,
+            action="watch",
+            watched_at=now,
+        )
+        session.add(event)
+        session.flush()
+
+        ep_info = {
+            "id": unwatched_ep.id,
+            "season_number": unwatched_ep.season_number,
+            "episode_number": unwatched_ep.episode_number,
+            "title": unwatched_ep.title,
+        }
+
+    estimator = ShowFinishEstimator(db_engine=db_engine, clock=clock)
+    updated_est = estimator.estimate_show(show_id)
+
+    return {
+        "success": True,
+        "scrobbled_episode": ep_info,
+        "updated_estimate": asdict(updated_est) if updated_est else None,
+    }
+
+
 @api_router.get("/recommendations")
 def api_get_recommendations(
     request: Request,
