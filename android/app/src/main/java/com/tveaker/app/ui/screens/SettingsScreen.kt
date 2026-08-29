@@ -10,7 +10,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,7 +65,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
         ) {
             Spacer(modifier = Modifier.height(2.dp))
 
-            // OTA Update Card
+            // OTA Updates Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = BgSurface,
@@ -97,107 +99,167 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             border = androidx.compose.foundation.BorderStroke(1.dp, StripeIris.copy(alpha = 0.35f))
                         ) {
                             Text(
-                                text = "v${state.currentVersionName} (b${state.currentVersionCode})",
+                                text = "Installed: v${state.currentVersionName} (b${state.currentVersionCode})",
                                 color = StripeCyan,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    if (state.serverVersionInfo != null) {
-                        Surface(
-                            color = if (state.isNewUpdateAvailable) StripeViolet.copy(alpha = 0.15f) else BgSurfaceElevated,
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (state.isNewUpdateAvailable) StripeViolet.copy(alpha = 0.45f) else BorderSubtle
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = if (state.isNewUpdateAvailable) StripeCyan else StripeEmerald,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = if (state.isNewUpdateAvailable) "⚡ Update Ready: v${state.serverVersionInfo?.versionName} (b${state.serverVersionInfo?.versionCode})" else "✓ Server Build: v${state.serverVersionInfo?.versionName} (b${state.serverVersionInfo?.versionCode})",
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (state.isNewUpdateAvailable) StripeCyan else TextPrimary,
-                                        fontSize = 13.sp
-                                    )
-                                }
-                                if (!state.serverVersionInfo?.changelog.isNullOrEmpty()) {
-                                    Text(
-                                        text = state.serverVersionInfo?.changelog ?: "",
-                                        color = TextSecondary,
-                                        fontSize = 11.sp,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                                if (state.serverVersionInfo?.apkSizeBytes != null) {
-                                    val sizeMb = String.format("%.2f", (state.serverVersionInfo?.apkSizeBytes ?: 0) / 1048576f)
-                                    Text(
-                                        text = "Size: $sizeMb MB",
-                                        color = TextMuted,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Text(
-                            text = "Could not connect to update server. Check Wi-Fi connection.",
-                            color = TextMuted,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                    // Status / Result Box
+                    Surface(
+                        color = if (state.isNewUpdateAvailable) StripeViolet.copy(alpha = 0.15f) else BgSurfaceElevated,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (state.isNewUpdateAvailable) StripeViolet.copy(alpha = 0.45f) else BorderSubtle
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (state.isNewUpdateAvailable) {
-                        if (state.downloadProgress != null) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                LinearProgressIndicator(
-                                    progress = { state.downloadProgress ?: 0f },
-                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                    color = StripeCyan,
-                                    trackColor = Border
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (state.isNewUpdateAvailable) Icons.Default.AutoAwesome else Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = if (state.isNewUpdateAvailable) StripeCyan else StripeEmerald,
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    text = "Downloading APK: ${((state.downloadProgress ?: 0f) * 100).toInt()}%",
+                                    text = if (state.serverVersionInfo != null) {
+                                        "Server: v${state.serverVersionInfo?.versionName} (Build ${state.serverVersionInfo?.versionCode})"
+                                    } else {
+                                        "Update Server"
+                                    },
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (state.isNewUpdateAvailable) StripeCyan else TextPrimary,
+                                    fontSize = 13.sp
+                                )
+                            }
+
+                            if (!state.updateMessage.isNullOrEmpty()) {
+                                Text(
+                                    text = state.updateMessage ?: "",
+                                    color = if (state.isNewUpdateAvailable) StripeCyan else TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (state.isNewUpdateAvailable) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+
+                            if (!state.serverVersionInfo?.changelog.isNullOrEmpty() && state.isNewUpdateAvailable) {
+                                Text(
+                                    text = "Notes: ${state.serverVersionInfo?.changelog ?: ""}",
                                     color = TextSecondary,
                                     fontSize = 11.sp,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
-                        } else {
-                            Button(
-                                onClick = { viewModel.startDownloadUpdate(context) },
-                                colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth().height(40.dp)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Download & Install Update", color = TextPrimary, fontWeight = FontWeight.Bold)
+                                if (state.serverVersionInfo?.apkSizeBytes != null) {
+                                    val sizeMb = String.format(java.util.Locale.US, "%.1f", (state.serverVersionInfo?.apkSizeBytes ?: 0) / 1048576f)
+                                    Text(
+                                        text = "Size: $sizeMb MB",
+                                        color = TextMuted,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                if (!state.lastCheckedTime.isNullOrEmpty()) {
+                                    Text(
+                                        text = "Checked: ${state.lastCheckedTime}",
+                                        color = TextMuted,
+                                        fontSize = 10.sp
+                                    )
+                                }
                             }
                         }
-                    } else {
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Download Progress or Action Buttons
+                    if (state.downloadProgress != null) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            LinearProgressIndicator(
+                                progress = { state.downloadProgress ?: 0f },
+                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                                color = StripeCyan,
+                                trackColor = Border
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Downloading APK: ${((state.downloadProgress ?: 0f) * 100).toInt()}%",
+                                    color = StripeCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (!state.downloadBytesProgress.isNullOrEmpty()) {
+                                    Text(
+                                        text = state.downloadBytesProgress ?: "",
+                                        color = TextSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else if (state.isNewUpdateAvailable) {
                         Button(
-                            onClick = { viewModel.checkForUpdates() },
-                            colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
+                            onClick = { viewModel.startDownloadUpdate(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
                             shape = RoundedCornerShape(8.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                            modifier = Modifier.fillMaxWidth().height(40.dp)
+                            modifier = Modifier.fillMaxWidth().height(42.dp)
                         ) {
-                            Text("Check for Updates", color = TextPrimary, fontWeight = FontWeight.Medium)
+                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextPrimary)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Download & Install Update", color = TextPrimary, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { viewModel.checkForUpdates() },
+                                enabled = !state.isCheckingUpdate,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = BgSurfaceElevated,
+                                    disabledContainerColor = BgSurfaceElevated.copy(alpha = 0.5f)
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                                modifier = Modifier.weight(1f).height(42.dp)
+                            ) {
+                                if (state.isCheckingUpdate) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = StripeCyan, strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Checking...", color = TextSecondary, fontSize = 12.sp)
+                                } else {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp), tint = StripeCyan)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Check for Updates", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                }
+                            }
+
+                            if (state.serverVersionInfo != null) {
+                                OutlinedButton(
+                                    onClick = { viewModel.startDownloadUpdate(context) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                                    modifier = Modifier.height(42.dp)
+                                ) {
+                                    Text("Reinstall", color = TextSecondary, fontSize = 11.sp)
+                                }
+                            }
                         }
                     }
                 }

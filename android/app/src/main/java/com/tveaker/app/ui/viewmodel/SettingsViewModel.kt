@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class SettingsUiState(
     val isLoading: Boolean = false,
@@ -25,10 +28,12 @@ data class SettingsUiState(
     val errorMessage: String? = null,
     // OTA Update state
     val isCheckingUpdate: Boolean = false,
+    val lastCheckedTime: String? = null,
     val serverVersionInfo: AppVersionDto? = null,
     val isNewUpdateAvailable: Boolean = false,
     val updateMessage: String? = null,
     val downloadProgress: Float? = null,
+    val downloadBytesProgress: String? = null,
     val readyToInstallApk: File? = null,
     val currentVersionCode: Int = BuildConfig.VERSION_CODE,
     val currentVersionName: String = BuildConfig.VERSION_NAME
@@ -78,6 +83,7 @@ class SettingsViewModel(
     fun checkForUpdates() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isCheckingUpdate = true, updateMessage = null)
+            val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
             val result = repository.getAppVersion()
             if (result.isSuccess) {
                 val versionInfo = result.getOrNull()
@@ -85,24 +91,27 @@ class SettingsViewModel(
                     val isNewer = versionInfo.versionCode > BuildConfig.VERSION_CODE
                     _uiState.value = _uiState.value.copy(
                         isCheckingUpdate = false,
+                        lastCheckedTime = timeStr,
                         serverVersionInfo = versionInfo,
                         isNewUpdateAvailable = isNewer,
                         updateMessage = if (isNewer) {
-                            "New Version: v${versionInfo.versionName} (Build ${versionInfo.versionCode})"
+                            "⚡ New version v${versionInfo.versionName} (b${versionInfo.versionCode}) available!"
                         } else {
-                            "Server has build v${versionInfo.versionName} (Build ${versionInfo.versionCode})"
+                            "✓ TVeaker is up to date (b${BuildConfig.VERSION_CODE})"
                         }
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isCheckingUpdate = false,
+                        lastCheckedTime = timeStr,
                         updateMessage = "Invalid update response from server."
                     )
                 }
             } else {
                 _uiState.value = _uiState.value.copy(
                     isCheckingUpdate = false,
-                    updateMessage = "Could not check updates: ${result.exceptionOrNull()?.message ?: "Network error"}"
+                    lastCheckedTime = timeStr,
+                    updateMessage = "Could not reach update server at ${_uiState.value.baseUrl}"
                 )
             }
         }
@@ -110,24 +119,31 @@ class SettingsViewModel(
 
     fun startDownloadUpdate(context: Context) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(downloadProgress = 0.01f, errorMessage = null)
+            _uiState.value = _uiState.value.copy(downloadProgress = 0.01f, downloadBytesProgress = "Starting...", errorMessage = null)
             val updateManager = UpdateManager(context)
             updateManager.downloadApk(repository.getApiService()).collect { state ->
                 when (state) {
                     is UpdateDownloadState.Downloading -> {
-                        _uiState.value = _uiState.value.copy(downloadProgress = state.progress)
+                        val downloadedMb = String.format(Locale.US, "%.1f", state.bytesDownloaded / 1048576f)
+                        val totalMb = if (state.totalBytes > 0) String.format(Locale.US, "%.1f", state.totalBytes / 1048576f) else "?"
+                        _uiState.value = _uiState.value.copy(
+                            downloadProgress = state.progress,
+                            downloadBytesProgress = "$downloadedMb MB / $totalMb MB"
+                        )
                     }
                     is UpdateDownloadState.ReadyToInstall -> {
                         _uiState.value = _uiState.value.copy(
                             downloadProgress = null,
+                            downloadBytesProgress = null,
                             readyToInstallApk = state.apkFile,
-                            updateMessage = "Download complete. Tap Install."
+                            updateMessage = "Download complete. Opening system installer..."
                         )
                         installUpdate(context, state.apkFile)
                     }
                     is UpdateDownloadState.Error -> {
                         _uiState.value = _uiState.value.copy(
                             downloadProgress = null,
+                            downloadBytesProgress = null,
                             errorMessage = state.message
                         )
                     }
@@ -158,7 +174,6 @@ class SettingsViewModel(
                     isSyncing = false,
                     syncMessage = "Sync completed: ${rep?.status} (Fetched: ${rep?.fetched?.values?.sum() ?: 0} items)"
                 )
-                checkHealth()
             } else {
                 _uiState.value = _uiState.value.copy(
                     isSyncing = false,
@@ -166,5 +181,13 @@ class SettingsViewModel(
                 )
             }
         }
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun clearSyncMessage() {
+        _uiState.value = _uiState.value.copy(syncMessage = null)
     }
 }
