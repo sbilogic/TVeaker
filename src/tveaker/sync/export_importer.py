@@ -367,36 +367,6 @@ class TraktExportImporter:
                             updated_at=parse_export_datetime(ws_item.get("last_updated_at")) or now,
                         )
 
-                        aired_episodes = s_raw.get("aired_episodes", 0)
-                        if aired_episodes > 0:
-                            existing_coords = set(
-                                session.execute(
-                                    select(Episode.season_number, Episode.episode_number).where(
-                                        Episode.show_id == s_id, Episode.season_number > 0
-                                    )
-                                ).all()
-                            )
-                            existing_count = len(existing_coords)
-                            if existing_count < aired_episodes:
-                                diff = aired_episodes - existing_count
-                                max_ep_s1 = max(
-                                    [ep_num for s_num, ep_num in existing_coords if s_num == 1]
-                                    or [0]
-                                )
-                                for i in range(1, diff + 1):
-                                    target_ep_num = max_ep_s1 + i
-                                    virtual_ep_trakt_id = -(s_id * 100000 + target_ep_num)
-                                    if (1, target_ep_num) not in existing_coords:
-                                        existing_coords.add((1, target_ep_num))
-                                        placeholder_ep = Episode(
-                                            show_id=s_id,
-                                            trakt_id=virtual_ep_trakt_id,
-                                            season_number=1,
-                                            episode_number=target_ep_num,
-                                            title=f"Episode {target_ep_num}",
-                                        )
-                                        session.add(placeholder_ep)
-
                         # Seed tracked show if missing
                         ts = session.get(TrackedShow, (1, s_id))
                         if not ts:

@@ -9,7 +9,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Upload
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
-from sqlalchemy import Engine, desc, select
+from sqlalchemy import Engine, desc, func, select
 
 from tveaker.auth.token_store import TokenStore
 from tveaker.auth.trakt_oauth import TraktOAuth, TraktOAuthError
@@ -508,7 +508,14 @@ def api_quick_scrobble(request: Request, show_id: int) -> dict[str, Any]:
                 status_code=400, detail="No unwatched episodes remaining for this show."
             )
 
+        max_hist_id = (
+            session.execute(select(func.coalesce(func.max(WatchEvent.history_id), 0))).scalar_one()
+            or 0
+        )
+        local_hist_id = max(max_hist_id + 1, 9000000000) if max_hist_id < 9000000000 else max_hist_id + 1
+
         event = WatchEvent(
+            history_id=local_hist_id,
             account_id=1,
             episode_id=unwatched_ep.id,
             action="watch",
@@ -617,7 +624,14 @@ def api_watch_episode(request: Request, show_id: int, episode_id: int) -> dict[s
         if ep is None or ep.show_id != show_id:
             raise HTTPException(status_code=404, detail="Episode not found for this show.")
 
+        max_hist_id = (
+            session.execute(select(func.coalesce(func.max(WatchEvent.history_id), 0))).scalar_one()
+            or 0
+        )
+        local_hist_id = max(max_hist_id + 1, 9000000000) if max_hist_id < 9000000000 else max_hist_id + 1
+
         event = WatchEvent(
+            history_id=local_hist_id,
             account_id=1,
             episode_id=ep.id,
             action="watch",
