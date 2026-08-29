@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Watch History{% endblock %}
+
+{% block content %}
+<div class="header-bar">
+  <div>
+    <h1 class="page-title">Watch History</h1>
+    <p style="color: var(--text-secondary); margin-top: 4px;">Chronological timeline of all scrobbled movies and show episodes</p>
+  </div>
+</div>
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Watched Date</th>
+        <th>Type</th>
+        <th>Title</th>
+        <th>Episode Details</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in history %}
+      <tr>
+        <td style="color: var(--text-secondary); font-size: 0.85rem;">
+          {{ item.watched_at.strftime('%b %d, %Y • %H:%M') if item.watched_at else '—' }}
+        </td>
+        <td>
+          <span class="badge {% if item.media_type == 'movie' %}badge-accent{% else %}badge-warning{% endif %}">
+            {{ item.media_type }}
+          </span>
+        </td>
+        <td style="font-weight: 600;">
+          {{ item.title }}
+        </td>
+        <td style="color: var(--text-secondary); font-size: 0.85rem;">
+          {% if item.media_type == 'episode' %}
+            S{{ '%02d' % item.season_number }}E{{ '%02d' % item.episode_number }} • {{ item.episode_title }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">{{ item.action }}</span>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">
+          No watch history recorded yet.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

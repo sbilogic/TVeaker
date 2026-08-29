@@ -25,9 +25,9 @@ class TokenData:
     token_type: str = "bearer"
     scope: str = "public"
 
-    def is_expired(self, buffer_seconds: int = 300) -> bool:
+    def is_expired(self, buffer_seconds: int = 300, now_ts: int | None = None) -> bool:
         """Return True if token expires within the buffer window."""
-        now = int(time.time())
+        now = now_ts if now_ts is not None else int(time.time())
         return (self.created_at + self.expires_in - buffer_seconds) <= now
 
     def to_json(self) -> str:
@@ -61,15 +61,16 @@ class TokenData:
 
 
 class TokenStore(Protocol):
-    """Protocol for persisting and retrieving Trakt OAuth tokens."""
+    """Protocol for secure token storage backends."""
 
     def get_token(self) -> TokenData | None: ...
     def save_token(self, token: TokenData) -> None: ...
+    def clear_token(self) -> None: ...
     def delete_token(self) -> None: ...
 
 
 class KeyringTokenStore:
-    """Store tokens securely in OS Credential Manager via keyring."""
+    """Store tokens securely using the OS Credential Manager / Keyring."""
 
     def __init__(self, service_name: str = SERVICE_NAME, username: str = USERNAME) -> None:
         self.service_name = service_name
@@ -81,27 +82,34 @@ class KeyringTokenStore:
             if not raw:
                 return None
             return TokenData.from_json(raw)
-        except (KeyringError, Exception) as e:
-            logger.warning("Failed to retrieve token from keyring: %s", type(e).__name__)
+        except KeyringError as e:
+            logger.error("Failed to read token from keyring: %s", e)
+            return None
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.warning("Corrupt token found in keyring, clearing: %s", e)
+            self.clear_token()
             return None
 
     def save_token(self, token: TokenData) -> None:
         try:
             keyring.set_password(self.service_name, self.username, token.to_json())
-        except (KeyringError, Exception) as e:
-            logger.error("Failed to save token to keyring: %s", type(e).__name__)
-            raise RuntimeError("Could not persist token to secure keyring") from e
+        except KeyringError as e:
+            logger.error("Failed to save token to keyring: %s", e)
+            raise
+
+    def clear_token(self) -> None:
+        with suppress(KeyringError):
+            keyring.delete_password(self.service_name, self.username)
 
     def delete_token(self) -> None:
-        with suppress(KeyringError, Exception):
-            keyring.delete_password(self.service_name, self.username)
+        self.clear_token()
 
 
 class MemoryTokenStore:
-    """In-memory token store for testing and headless runs."""
+    """In-memory token store for deterministic unit and integration testing."""
 
     def __init__(self, initial_token: TokenData | None = None) -> None:
-        self._token: TokenData | None = initial_token
+        self._token = initial_token
 
     def get_token(self) -> TokenData | None:
         return self._token
@@ -109,5 +117,8 @@ class MemoryTokenStore:
     def save_token(self, token: TokenData) -> None:
         self._token = token
 
-    def delete_token(self) -> None:
+    def clear_token(self) -> None:
         self._token = None
+
+    def delete_token(self) -> None:
+        self.clear_token()

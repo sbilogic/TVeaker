@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Settings & Sync{% endblock %}
+
+{% block content %}
+<div class="header-bar">
+  <div>
+    <h1 class="page-title">Settings & System Doctor</h1>
+    <p style="color: var(--text-secondary); margin-top: 4px;">Manage your Trakt connection, database sync operations, and system health</p>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 32px;">
+  <!-- Account & Token Info -->
+  <div class="card">
+    <h3 class="card-title">Trakt Account Connection</h3>
+    <div style="margin: 16px 0; font-size: 0.9rem;">
+      {% if account %}
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: var(--text-secondary);">Username:</span>
+          <strong>{{ account.username }}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: var(--text-secondary);">Trakt UUID:</span>
+          <span style="font-family: monospace; font-size: 0.8rem;">{{ account.trakt_uuid }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <span style="color: var(--text-secondary);">Connected Since:</span>
+          <span>{{ account.connected_at.strftime('%b %d, %Y') if account.connected_at else '—' }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-secondary);">Last Successful Sync:</span>
+          <strong style="color: var(--success);">{{ account.last_successful_sync_at.strftime('%b %d, %Y • %H:%M') if account.last_successful_sync_at else 'Never' }}</strong>
+        </div>
+      {% else %}
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">No Trakt account connected yet.</p>
+        <a href="/auth/login" class="btn btn-primary" style="width: 100%;">Connect Trakt Account</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Manual Sync Actions -->
+  <div class="card">
+    <h3 class="card-title">Manual Sync Triggers</h3>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px;">
+      <button class="btn btn-secondary" onclick="triggerSync('incremental')">
+        ⚡ 15-Minute Incremental Polling
+      </button>
+      <button class="btn btn-secondary" onclick="triggerSync('full')">
+        🔄 7-Day Full Reconciliation & Deletion Cleanup
+      </button>
+      <button class="btn btn-secondary" onclick="triggerSync('initial')">
+        🚀 Re-run Full Initial Import
+      </button>
+    </div>
+  </div>
+</div>
+
+<h2 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 16px;">Recent Sync Runs</h2>
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Run ID</th>
+        <th>Mode</th>
+        <th>Status</th>
+        <th>Started At</th>
+        <th>Finished At</th>
+        <th>Fetched / Inserted</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in sync_runs %}
+      <tr>
+        <td>#{{ run.id }}</td>
+        <td><span class="badge badge-accent">{{ run.mode }}</span></td>
+        <td>
+          <span class="badge {% if run.status == 'success' %}badge-success{% elif run.status == 'partial' %}badge-warning{% else %}badge-danger{% endif %}">
+            {{ run.status }}
+          </span>
+        </td>
+        <td style="font-size: 0.85rem; color: var(--text-secondary);">
+          {{ run.started_at.strftime('%b %d, %H:%M:%S') if run.started_at else '—' }}
+        </td>
+        <td style="font-size: 0.85rem; color: var(--text-secondary);">
+          {{ run.finished_at.strftime('%b %d, %H:%M:%S') if run.finished_at else 'In Progress' }}
+        </td>
+        <td style="font-size: 0.8rem; font-family: monospace;">
+          {{ run.counts_json }}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+          No sync runs recorded yet.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

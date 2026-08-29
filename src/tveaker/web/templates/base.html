@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}TVeaker{% endblock %} • TV & Movie Manager</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo-container">
+      <div class="logo-title">TVeaker</div>
+      <span class="logo-badge">LOCAL</span>
+    </div>
+
+    <ul class="nav-links">
+      <li class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
+        <a href="/">
+          <span>📊</span>
+          <span>Dashboard</span>
+        </a>
+      </li>
+      <li class="nav-item {% if active_page == 'shows' %}active{% endif %}">
+        <a href="/shows">
+          <span>📺</span>
+          <span>Tracked Shows</span>
+        </a>
+      </li>
+      <li class="nav-item {% if active_page == 'recommendations' %}active{% endif %}">
+        <a href="/recommendations">
+          <span>✨</span>
+          <span>Recommendations</span>
+        </a>
+      </li>
+      <li class="nav-item {% if active_page == 'history' %}active{% endif %}">
+        <a href="/history">
+          <span>📜</span>
+          <span>Watch History</span>
+        </a>
+      </li>
+      <li class="nav-item {% if active_page == 'settings' %}active{% endif %}">
+        <a href="/settings">
+          <span>⚙️</span>
+          <span>Settings & Sync</span>
+        </a>
+      </li>
+    </ul>
+
+    <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--text-muted);">
+      {% if account %}
+        <div>👤 {{ account.username }}</div>
+        <div style="margin-top: 4px; font-size: 0.75rem;">Connected to Trakt</div>
+      {% else %}
+        <div>⚠️ Trakt Disconnected</div>
+        <a href="/auth/login" class="btn btn-sm btn-primary" style="margin-top: 8px; width: 100%;">Connect Trakt</a>
+      {% endif %}
+    </div>
+  </aside>
+
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

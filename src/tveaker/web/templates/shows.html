@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Tracked Shows{% endblock %}
+
+{% block content %}
+<div class="header-bar">
+  <div>
+    <h1 class="page-title">Tracked Shows</h1>
+    <p style="color: var(--text-secondary); margin-top: 4px;">Manage statuses, viewing paces, and specials inclusion</p>
+  </div>
+</div>
+
+<div class="filters-bar">
+  <a href="/shows" class="filter-btn {% if not current_status %}active{% endif %}">All</a>
+  <a href="/shows?status=watching" class="filter-btn {% if current_status == 'watching' %}active{% endif %}">Watching</a>
+  <a href="/shows?status=planned" class="filter-btn {% if current_status == 'planned' %}active{% endif %}">Planned</a>
+  <a href="/shows?status=paused" class="filter-btn {% if current_status == 'paused' %}active{% endif %}">Paused</a>
+  <a href="/shows?status=completed" class="filter-btn {% if current_status == 'completed' %}active{% endif %}">Completed</a>
+  <a href="/shows?status=dropped" class="filter-btn {% if current_status == 'dropped' %}active{% endif %}">Dropped</a>
+</div>
+
+<div class="table-container">
+  <table>
+    <thead>
+      <tr>
+        <th>Show</th>
+        <th>Progress</th>
+        <th>Status</th>
+        <th>Target Finish</th>
+        <th>Pace (Eps/Wk)</th>
+        <th>Specials</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for show in shows %}
+      <tr>
+        <td>
+          <div style="font-weight: 600; color: var(--text-primary);">{{ show.title }}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">{{ show.year or '' }}</div>
+        </td>
+        <td style="min-width: 140px;">
+          <div style="font-size: 0.8rem; margin-bottom: 4px;">{{ show.watched_episodes }}/{{ show.total_episodes }} eps ({{ show.completion_percent }}%)</div>
+          <div class="progress-bar-container" style="margin: 0; height: 6px;">
+            <div class="progress-bar-fill" style="width: {{ show.completion_percent }}%;"></div>
+          </div>
+        </td>
+        <td>
+          <select style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;" onchange="updateShowStatus({{ show.show_id }}, this.value)">
+            <option value="watching" {% if show.status == 'watching' %}selected{% endif %}>Watching</option>
+            <option value="planned" {% if show.status == 'planned' %}selected{% endif %}>Planned</option>
+            <option value="paused" {% if show.status == 'paused' %}selected{% endif %}>Paused</option>
+            <option value="completed" {% if show.status == 'completed' %}selected{% endif %}>Completed</option>
+            <option value="dropped" {% if show.status == 'dropped' %}selected{% endif %}>Dropped</option>
+          </select>
+        </td>
+        <td>
+          {% if show.estimated_finish_date %}
+            <strong style="color: var(--accent);">{{ show.estimated_finish_date.strftime('%b %d, %Y') }}</strong>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">~{{ show.days_to_finish }} days</div>
+          {% elif show.is_caught_up %}
+            <span style="color: var(--success); font-size: 0.85rem;">Caught up</span>
+          {% else %}
+            <span style="color: var(--text-muted); font-size: 0.85rem;">—</span>
+          {% endif %}
+        </td>
+        <td>
+          <span>{{ show.episodes_per_week }}</span>
+          <button class="btn btn-sm btn-secondary" style="margin-left: 6px; padding: 2px 6px;" onclick="updateShowPace({{ show.show_id }})">✏️</button>
+        </td>
+        <td>
+          <button class="btn btn-sm {% if show.include_specials %}btn-primary{% else %}btn-secondary{% endif %}" onclick="toggleSpecials({{ show.show_id }}, {{ 'true' if show.include_specials else 'false' }})">
+            {{ 'Included' if show.include_specials else 'Excluded' }}
+          </button>
+        </td>
+        <td>
+          <a href="https://trakt.tv/shows/{{ show.trakt_id }}" target="_blank" class="btn btn-sm btn-secondary">Trakt ↗</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">
+          No shows found matching this filter.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
