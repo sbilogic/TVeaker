@@ -18,36 +18,39 @@
 {% endif %}
 
 <!-- Android Companion App Download Banner -->
-<div class="card" style="border-color: rgba(99, 102, 241, 0.4); background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(56, 189, 248, 0.05) 100%); margin-bottom: 28px;">
+<div class="card" style="border-color: rgba(99, 102, 241, 0.4); background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(56, 189, 248, 0.06) 100%); margin-bottom: 28px;">
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
     <div style="display: flex; gap: 16px; align-items: center;">
-      <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--gradient-accent); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+      <div style="width: 52px; height: 52px; border-radius: var(--radius-md); background: var(--gradient-apple); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-glow-cyan);">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
       </div>
       <div>
-        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary);">
+        <h3 style="font-size: 1.2rem; font-weight: 800; color: #fff;">
           TVeaker Native Android Companion App
         </h3>
-        <p style="font-size: 0.84rem; color: var(--text-secondary); margin-top: 2px;">
-          Install the latest APK (v1.1.0) with in-app OTA updates, background sync, and instant notifications.
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
+          Install the APK (v1.1.0) with in-app OTA updates, velocity sliders, and instant notifications.
         </p>
+        <div style="font-size: 0.78rem; color: var(--accent-cyan); margin-top: 6px; font-family: var(--font-mono);">
+          LAN Connection URL: <strong>http://192.168.1.33:8000/</strong>
+        </div>
       </div>
     </div>
-    <a href="/api/v1/app/download-apk" class="btn btn-primary" style="font-weight: 700;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+    <a href="/api/v1/app/download-apk" class="btn btn-primary" style="font-weight: 800; padding: 12px 24px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
       <span>Download APK (v1.1.0)</span>
     </a>
   </div>
 </div>
 
 <!-- Free Trakt Data Export Importer -->
-<div class="card" style="border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.04); margin-bottom: 28px;">
+<div class="card" style="border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.05); margin-bottom: 28px;">
   <div style="display: flex; gap: 16px; align-items: flex-start;">
-    <div style="font-size: 1.8rem; background: rgba(56, 189, 248, 0.1); width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: 1px solid rgba(56, 189, 248, 0.25);">
+    <div style="font-size: 1.8rem; background: rgba(56, 189, 248, 0.12); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: 1px solid rgba(56, 189, 248, 0.3);">
       📦
     </div>
     <div style="flex-grow: 1;">
-      <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;">
+      <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--accent-cyan); margin-bottom: 4px;">
         100% Free Trakt Data Import (No VIP / No API Keys Required)
       </h3>
       <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px;">
@@ -55,65 +58,60 @@
       </p>
 
       <form method="POST" action="/settings/import-export" enctype="multipart/form-data" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
-        <input type="file" name="export_file" accept=".zip" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(0, 0, 0, 0.3); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);" />
-        <button type="submit" class="btn btn-primary" style="font-weight: 700;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <span>Import Trakt ZIP</span>
+        <input type="file" name="export_file" accept=".zip" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(0, 0, 0, 0.4); padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);" />
+        <button type="submit" class="btn btn-primary" style="font-weight: 800;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span>Import ZIP Archive</span>
         </button>
       </form>
     </div>
   </div>
 </div>
 
-<div class="grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 32px;">
-  <!-- Account & Token Info -->
+<div class="grid grid-cols-2">
+  <!-- System State Doctor -->
   <div class="card">
-    <h3 class="card-title" style="margin-bottom: 16px;">Trakt Account & Database State</h3>
-    <div style="font-size: 0.88rem;">
-      {% if account %}
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
-          <span style="color: var(--text-secondary);">Username:</span>
-          <strong>{{ account.username }}</strong>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
-          <span style="color: var(--text-secondary);">Trakt UUID:</span>
-          <span style="font-family: var(--font-mono); font-size: 0.78rem;">{{ account.trakt_uuid }}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px;">
-          <span style="color: var(--text-secondary);">Connected Since:</span>
-          <span>{{ account.connected_at.strftime('%b %d, %Y') if account.connected_at else '—' }}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-          <span style="color: var(--text-secondary);">Last Sync:</span>
-          <strong style="color: var(--success);">{{ account.last_successful_sync_at.strftime('%b %d, %Y • %H:%M') if account.last_successful_sync_at else 'Local Data Loaded' }}</strong>
-        </div>
-        <form method="POST" action="/auth/disconnect">
-          <button type="submit" class="btn btn-secondary" style="color: var(--danger); width: 100%;">Disconnect Account</button>
-        </form>
-      {% else %}
-        <p style="color: var(--text-secondary); margin-bottom: 16px;">Database initialized in Local Mode.</p>
-        <a href="/auth/login" class="btn btn-primary" style="width: 100%;">Connect Trakt OAuth</a>
-      {% endif %}
+    <h2 class="card-title" style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+      System State Doctor
+    </h2>
+    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.88rem;">
+      <div style="display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);">
+        <span style="color: var(--text-secondary);">Local SQLite Database</span>
+        <strong style="color: var(--success);">Connected & Healthy</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);">
+        <span style="color: var(--text-secondary);">Trakt Account Sync</span>
+        <strong style="color: var(--text-primary);">{{ account.username if account else 'Not Connected' }}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);">
+        <span style="color: var(--text-secondary);">Trakt API Access Mode</span>
+        <strong style="color: var(--accent-cyan);">Strictly Read-Only (Local Modifications)</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--text-secondary);">Last Successful Sync</span>
+        <span style="font-family: var(--font-mono); color: var(--text-muted);">
+          {{ account.last_successful_sync_at.strftime('%Y-%m-%d %H:%M:%S') if account and account.last_successful_sync_at else 'Never' }}
+        </span>
+      </div>
     </div>
   </div>
 
-  <!-- Manual Sync Actions -->
+  <!-- Sync Actions Card -->
   <div class="card">
-    <h3 class="card-title" style="margin-bottom: 16px;">Manual Sync Triggers</h3>
-    <div style="display: flex; flex-direction: column; gap: 10px;">
+    <h2 class="card-title" style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+      Sync Engine Triggers
+    </h2>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
       <button class="btn btn-secondary" onclick="triggerSync('incremental')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-        <span>⚡ 15-Minute Incremental Polling</span>
+        <span>⚡ 15-Minute Incremental Sync</span>
       </button>
       <button class="btn btn-secondary" onclick="triggerSync('full')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-        <span>🔄 7-Day Full Reconciliation & Deletion Cleanup</span>
-      </button>
-      <button class="btn btn-secondary" onclick="triggerSync('initial')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-        <span>🚀 Re-run Full Initial Import</span>
+        <span>🔄 7-Day Full Reconciliation Sync</span>
       </button>
     </div>
   </div>
 </div>
+
 {% endblock %}
