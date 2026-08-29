@@ -524,6 +524,14 @@ class TraktExportImporter:
 
             logger.info("Trakt export successfully imported for @%s: %s", username, counts)
 
+            # Auto-hydrate real posters and episode titles for all imported items
+            try:
+                from tveaker.metadata import hydrate_all_metadata
+
+                hydrate_all_metadata(self.db_engine)
+            except Exception as e:
+                logger.warning("Post-import metadata hydration warning: %s", e)
+
             return ExportImportReport(
                 account_username=username,
                 movies_count=len(movies_cnt),

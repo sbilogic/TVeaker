@@ -59,6 +59,11 @@ def create_app(
     app.state.trakt_client = app_client
     app.state.account_sync = app_sync
 
+    # Trigger background metadata & poster hydration thread
+    from tveaker.metadata import start_background_metadata_hydration
+
+    start_background_metadata_hydration(app_engine)
+
     # Include routers
     app.include_router(ui_router)
     app.include_router(api_router)
