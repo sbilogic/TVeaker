@@ -26,6 +26,8 @@ data class ShowEstimateDto(
     @Json(name = "watched_episodes") val watchedEpisodes: Int,
     @Json(name = "remaining_episodes") val remainingEpisodes: Int,
     @Json(name = "unwatched_minutes") val unwatchedMinutes: Int,
+    @Json(name = "avg_runtime_minutes") val avgRuntimeMinutes: Int? = null,
+    @Json(name = "remaining_runtime_display") val remainingRuntimeDisplay: String? = null,
     @Json(name = "completion_percent") val completionPercent: Float,
     @Json(name = "episodes_per_week") val episodesPerWeek: Float,
     @Json(name = "pace_source") val paceSource: String,
@@ -33,6 +35,16 @@ data class ShowEstimateDto(
     @Json(name = "days_to_finish") val daysToFinish: Int?,
     @Json(name = "is_caught_up") val isCaughtUp: Boolean,
     @Json(name = "next_air_date") val nextAirDate: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class AppVersionDto(
+    @Json(name = "version_code") val versionCode: Int,
+    @Json(name = "version_name") val versionName: String,
+    @Json(name = "apk_url") val apkUrl: String,
+    val changelog: String? = null,
+    @Json(name = "release_date") val releaseDate: String? = null,
+    @Json(name = "apk_size_bytes") val apkSizeBytes: Long? = null
 )
 
 @JsonClass(generateAdapter = true)

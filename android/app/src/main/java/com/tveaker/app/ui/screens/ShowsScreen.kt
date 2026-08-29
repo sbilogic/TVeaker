@@ -1,7 +1,6 @@
 package com.tveaker.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,13 +22,14 @@ import com.tveaker.app.ui.viewmodel.ShowsViewModel
 @Composable
 fun ShowsScreen(viewModel: ShowsViewModel) {
     val state by viewModel.uiState.collectAsState()
-    val filterOptions = listOf(
-        "All" to null,
-        "Watching" to "watching",
-        "Planned" to "planned",
-        "Paused" to "paused",
-        "Completed" to "completed",
-        "Dropped" to "dropped"
+
+    val statuses = listOf(
+        null to "All",
+        "watching" to "Watching",
+        "planned" to "Planned",
+        "paused" to "Paused",
+        "completed" to "Completed",
+        "dropped" to "Dropped"
     )
 
     Scaffold(
@@ -50,12 +50,12 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            // Filters row
+            // Status filter chips
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(vertical = 12.dp)
             ) {
-                items(filterOptions) { (label, statusValue) ->
+                items(statuses) { (statusValue, label) ->
                     val isSelected = state.selectedStatus == statusValue
                     FilterChip(
                         selected = isSelected,
@@ -125,7 +125,7 @@ fun ShowDetailCard(
                         color = TextPrimary
                     )
                     Text(
-                        text = "${show.watchedEpisodes}/${show.totalEpisodes} episodes • ${show.episodesPerWeek} eps/wk",
+                        text = "${show.watchedEpisodes}/${show.totalEpisodes} eps • ${show.avgRuntimeMinutes ?: 45}m/ep • ${show.episodesPerWeek} eps/wk",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
@@ -138,7 +138,11 @@ fun ShowDetailCard(
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         modifier = Modifier.height(30.dp)
                     ) {
-                        Text(show.status.capitalize(), color = Accent, fontSize = 12.sp)
+                        Text(
+                            show.status.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                            color = Accent,
+                            fontSize = 12.sp
+                        )
                     }
                     DropdownMenu(
                         expanded = expanded,
@@ -147,7 +151,12 @@ fun ShowDetailCard(
                     ) {
                         listOf("watching", "planned", "paused", "completed", "dropped").forEach { s ->
                             DropdownMenuItem(
-                                text = { Text(s.capitalize(), color = TextPrimary) },
+                                text = {
+                                    Text(
+                                        s.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() },
+                                        color = TextPrimary
+                                    )
+                                },
                                 onClick = {
                                     expanded = false
                                     onStatusChange(s)
@@ -175,22 +184,45 @@ fun ShowDetailCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            // Progress details with remaining runtime
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${show.completionPercent}% completed",
+                    color = TextMuted,
+                    fontSize = 11.sp
+                )
+                Text(
+                    text = if (show.remainingEpisodes > 0) {
+                        "${show.remainingEpisodes} left (${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"})"
+                    } else "0 eps left",
+                    color = Accent,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (show.estimatedFinishDate != null) "Finish: ${show.estimatedFinishDate.substring(0, minOf(10, show.estimatedFinishDate.length))}" else "Status: ${show.status}",
-                    color = TextMuted,
-                    fontSize = 12.sp
+                    text = if (show.estimatedFinishDate != null) "Target: ${show.estimatedFinishDate.substring(0, minOf(10, show.estimatedFinishDate.length))}" else if (show.isCaughtUp) "✓ Caught up" else "Status: ${show.status}",
+                    color = if (show.isCaughtUp) Success else TextSecondary,
+                    fontSize = 12.sp,
+                    fontWeight = if (show.isCaughtUp) FontWeight.Medium else FontWeight.Normal
                 )
-                Text(
-                    text = "${show.completionPercent}% done",
-                    color = TextMuted,
-                    fontSize = 12.sp
-                )
+                if (show.daysToFinish != null && show.daysToFinish > 0) {
+                    Text(
+                        text = "~${show.daysToFinish} days left",
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
     }

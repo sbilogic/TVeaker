@@ -101,16 +101,30 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                 )
             }
 
-            if (state.recommendations.isNotEmpty()) {
+            if (state.recommendations.isEmpty() && !state.isLoading) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = BgSurface)
+                    ) {
+                        Text(
+                            text = "Sync your watch history to see recommendations.",
+                            color = TextSecondary,
+                            modifier = Modifier.padding(24.dp)
+                        )
+                    }
+                }
+            } else {
                 item {
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(state.recommendations) { rec ->
                             RecommendationMiniCard(
                                 item = rec,
-                                onAction = { action -> viewModel.submitFeedback(rec.candidateId, action) }
+                                onAction = { action ->
+                                    viewModel.submitFeedback(rec.candidateId, action)
+                                }
                             )
                         }
                     }
@@ -143,7 +157,7 @@ fun ActiveShowCard(show: ShowEstimateDto) {
                         color = TextPrimary
                     )
                     Text(
-                        text = "${show.watchedEpisodes}/${show.totalEpisodes} eps (${show.completionPercent}%)",
+                        text = "${show.watchedEpisodes}/${show.totalEpisodes} eps • ${show.avgRuntimeMinutes ?: 45}m/ep",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
@@ -179,7 +193,27 @@ fun ActiveShowCard(show: ShowEstimateDto) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            // Progress details
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${show.completionPercent}% completed",
+                    fontSize = 11.sp,
+                    color = TextMuted
+                )
+                Text(
+                    text = if (show.remainingEpisodes > 0) {
+                        "${show.remainingEpisodes} left (${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"})"
+                    } else "0 eps left",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Accent
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Finish date footer
             if (show.estimatedFinishDate != null) {
@@ -228,60 +262,70 @@ fun RecommendationMiniCard(
     onAction: (String) -> Unit
 ) {
     Card(
-        modifier = Modifier.width(260.dp),
+        modifier = Modifier
+            .width(220.dp)
+            .height(170.dp),
         colors = CardDefaults.cardColors(containerColor = BgSurface),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = item.mediaType.uppercase(),
+                        color = Accent,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${(item.score * 100).toInt()}% match",
+                        color = Accent,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
                     text = item.title,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
                     color = TextPrimary,
+                    fontSize = 14.sp,
                     maxLines = 1,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.padding(top = 4.dp)
                 )
                 Text(
-                    text = "${(item.score * 100).toInt()}%",
-                    color = Accent,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
+                    text = item.explanation,
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    maxLines = 2,
+                    lineHeight = 14.sp,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
-            Text(
-                text = "${item.mediaType.uppercase()} • ${item.runtimeMinutes ?: 45}m",
-                color = TextSecondary,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-            Text(
-                text = item.explanation,
-                color = TextMuted,
-                fontSize = 11.sp,
-                lineHeight = 15.sp,
-                maxLines = 2,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Button(
                     onClick = { onAction("accepted") },
                     colors = ButtonDefaults.buttonColors(containerColor = Accent),
-                    modifier = Modifier.weight(1f).height(32.dp),
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.weight(1f).height(28.dp)
                 ) {
                     Text("Watch", color = BgPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 OutlinedButton(
                     onClick = { onAction("not_now") },
-                    modifier = Modifier.height(32.dp),
-                    contentPadding = PaddingValues(0.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.height(28.dp)
                 ) {
                     Text("Later", color = TextSecondary, fontSize = 11.sp)
                 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -16,11 +17,12 @@ import com.tveaker.app.ui.viewmodel.SettingsViewModel
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val state by viewModel.uiState.collectAsState()
     var urlInput by remember { mutableStateOf(state.baseUrl) }
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings & Sync", fontWeight = FontWeight.Bold) },
+                title = { Text("Settings & Updates", fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BgPrimary,
                     titleContentColor = TextPrimary
@@ -36,6 +38,97 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // OTA Update Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = BgSurface),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("App Updates (OTA)", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                        Text(
+                            text = "v${state.currentVersionName} (${state.currentVersionCode})",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (state.availableUpdate != null) {
+                        Surface(
+                            color = Accent.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "⚡ New Version: v${state.availableUpdate?.versionName}",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Accent,
+                                    fontSize = 14.sp
+                                )
+                                if (!state.availableUpdate?.changelog.isNullOrEmpty()) {
+                                    Text(
+                                        text = state.availableUpdate?.changelog ?: "",
+                                        color = TextSecondary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (state.downloadProgress != null) {
+                            LinearProgressIndicator(
+                                progress = { state.downloadProgress ?: 0f },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                color = Accent,
+                                trackColor = Border
+                            )
+                        } else if (state.readyToInstallApk != null) {
+                            Button(
+                                onClick = { viewModel.installUpdate(context) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Success),
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                            ) {
+                                Text("Install Update Now", color = BgPrimary, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Button(
+                                onClick = { viewModel.startDownloadUpdate(context) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Accent),
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+                            ) {
+                                Text("Download & Install Update", color = BgPrimary, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = state.updateMessage ?: "App is up to date",
+                            color = Success,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                        OutlinedButton(
+                            onClick = { viewModel.checkForUpdates() },
+                            enabled = !state.isCheckingUpdate,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                        ) {
+                            if (state.isCheckingUpdate) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Accent)
+                            } else {
+                                Text("Check for Updates", color = TextPrimary)
+                            }
+                        }
+                    }
+                }
+            }
+
             // Connection Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -98,7 +191,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         enabled = !state.isSyncing,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Incremental Sync (15m Polling)", color = TextPrimary)
+                        Text("⚡ 15-Minute Incremental Polling", color = TextPrimary)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -109,16 +202,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         enabled = !state.isSyncing,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("7-Day Full Reconciliation", color = TextPrimary)
+                        Text("🔄 7-Day Full Reconciliation", color = TextPrimary)
                     }
 
                     if (state.syncMessage != null) {
-                        Text(
-                            text = state.syncMessage ?: "",
-                            color = Success,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 10.dp)
-                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(state.syncMessage ?: "", color = Success, fontSize = 12.sp)
                     }
                 }
             }

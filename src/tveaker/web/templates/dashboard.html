@@ -6,7 +6,7 @@
 <div class="header-bar">
   <div>
     <h1 class="page-title">Watching Dashboard</h1>
-    <p style="color: var(--text-secondary); margin-top: 4px;">Track completion pace and what to watch next</p>
+    <p style="color: var(--text-secondary); margin-top: 4px;">Track completion pace, remaining runtime, and what to watch next</p>
   </div>
   <div>
     <button id="sync-trigger-btn" class="btn btn-secondary" onclick="triggerSync('incremental')">
@@ -36,7 +36,13 @@
     </div>
     <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 16px;">
       <span>{{ est.completion_percent }}% completed</span>
-      <span>{{ est.remaining_episodes }} left</span>
+      <span>
+        {% if est.remaining_episodes > 0 %}
+          <strong>{{ est.remaining_episodes }}</strong> left (<strong>{{ est.remaining_runtime_display }}</strong>)
+        {% else %}
+          0 eps left
+        {% endif %}
+      </span>
     </div>
 
     <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.85rem;">
@@ -46,7 +52,7 @@
           <strong style="color: var(--accent);">{{ est.estimated_finish_date.strftime('%b %d, %Y') }}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
-          <span>{{ est.episodes_per_week }} eps/week ({{ est.pace_source }})</span>
+          <span>{{ est.episodes_per_week }} eps/wk ({{ est.avg_runtime_minutes }}m/ep)</span>
           <span>~{{ est.days_to_finish }} days</span>
         </div>
       {% else %}
@@ -100,7 +106,7 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="card" style="text-align: center; padding: 20px; color: var(--text-secondary);">
+<div class="card" style="text-align: center; padding: 40px; color: var(--text-secondary);">
   <p>Sync your watch history to generate personalized recommendations.</p>
 </div>
 {% endif %}

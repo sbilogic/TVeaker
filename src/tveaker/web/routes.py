@@ -568,3 +568,43 @@ def api_get_history(
                 )
 
     return history_items
+
+
+# ---------------------------------------------------------
+# OTA App Update Endpoints
+# ---------------------------------------------------------
+@api_router.get("/app/version")
+@ui_router.get("/apks/latest.json")
+def api_get_app_version() -> dict[str, Any]:
+    """Return the latest available Android APK build version and release notes."""
+    apk_path = Path("android/app/build/outputs/apk/debug/app-debug.apk")
+    size_bytes = apk_path.stat().st_size if apk_path.exists() else None
+
+    return {
+        "version_code": 2,
+        "version_name": "1.1.0",
+        "apk_url": "/api/v1/app/download-apk",
+        "changelog": (
+            "Accurate average runtime estimation, remaining runtime badges, "
+            "and in-app OTA update installer."
+        ),
+        "release_date": "2026-08-29",
+        "apk_size_bytes": size_bytes,
+    }
+
+
+@api_router.get("/app/download-apk")
+@ui_router.get("/apks/app-debug.apk")
+def api_download_apk() -> Any:
+    """Download the latest TVeaker Android APK for OTA installation."""
+    from fastapi.responses import FileResponse
+
+    apk_path = Path("android/app/build/outputs/apk/debug/app-debug.apk")
+    if not apk_path.exists():
+        raise HTTPException(status_code=404, detail="APK build not found on server.")
+
+    return FileResponse(
+        path=str(apk_path),
+        media_type="application/vnd.android.package-archive",
+        filename="tveaker-v1.1.0.apk",
+    )

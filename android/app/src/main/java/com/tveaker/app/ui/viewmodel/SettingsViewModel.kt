@@ -1,13 +1,19 @@
 package com.tveaker.app.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tveaker.app.BuildConfig
+import com.tveaker.app.data.model.AppVersionDto
 import com.tveaker.app.data.model.HealthDto
 import com.tveaker.app.data.repository.TVeakerRepository
+import com.tveaker.app.ui.update.UpdateDownloadState
+import com.tveaker.app.ui.update.UpdateManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class SettingsUiState(
     val isLoading: Boolean = false,
@@ -15,7 +21,15 @@ data class SettingsUiState(
     val baseUrl: String = "http://10.0.2.2:8000/",
     val syncMessage: String? = null,
     val isSyncing: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    // OTA Update state
+    val isCheckingUpdate: Boolean = false,
+    val availableUpdate: AppVersionDto? = null,
+    val updateMessage: String? = null,
+    val downloadProgress: Float? = null,
+    val readyToInstallApk: File? = null,
+    val currentVersionCode: Int = BuildConfig.VERSION_CODE,
+    val currentVersionName: String = BuildConfig.VERSION_NAME
 )
 
 class SettingsViewModel(
@@ -27,12 +41,14 @@ class SettingsViewModel(
 
     init {
         checkHealth()
+        checkForUpdates()
     }
 
     fun setBaseUrl(newUrl: String) {
         repository.updateBaseUrl(newUrl)
         _uiState.value = _uiState.value.copy(baseUrl = newUrl)
         checkHealth()
+        checkForUpdates()
     }
 
     fun checkHealth() {
@@ -50,6 +66,73 @@ class SettingsViewModel(
                     errorMessage = result.exceptionOrNull()?.message ?: "Failed to connect to TVeaker backend"
                 )
             }
+        }
+    }
+
+    fun checkForUpdates() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isCheckingUpdate = true, updateMessage = null)
+            val result = repository.getAppVersion()
+            if (result.isSuccess) {
+                val versionInfo = result.getOrNull()
+                if (versionInfo != null && versionInfo.versionCode > BuildConfig.VERSION_CODE) {
+                    _uiState.value = _uiState.value.copy(
+                        isCheckingUpdate = false,
+                        availableUpdate = versionInfo,
+                        updateMessage = "New update available: v${versionInfo.versionName} (Build ${versionInfo.versionCode})"
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isCheckingUpdate = false,
+                        availableUpdate = null,
+                        updateMessage = "You're on the latest version (v${BuildConfig.VERSION_NAME})"
+                    )
+                }
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isCheckingUpdate = false,
+                    updateMessage = "Could not check for updates"
+                )
+            }
+        }
+    }
+
+    fun startDownloadUpdate(context: Context) {
+        viewModelScope.launch {
+            val updateManager = UpdateManager(context)
+            updateManager.downloadApk(repository.getApiService()).collect { state ->
+                when (state) {
+                    is UpdateDownloadState.Downloading -> {
+                        _uiState.value = _uiState.value.copy(downloadProgress = state.progress)
+                    }
+                    is UpdateDownloadState.ReadyToInstall -> {
+                        _uiState.value = _uiState.value.copy(
+                            downloadProgress = null,
+                            readyToInstallApk = state.apkFile,
+                            updateMessage = "Download complete. Tap Install Update."
+                        )
+                        installUpdate(context, state.apkFile)
+                    }
+                    is UpdateDownloadState.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            downloadProgress = null,
+                            errorMessage = state.message
+                        )
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+
+    fun installUpdate(context: Context, apkFile: File? = null) {
+        val fileToInstall = apkFile ?: _uiState.value.readyToInstallApk ?: return
+        val updateManager = UpdateManager(context)
+        val result = updateManager.installApk(fileToInstall)
+        if (result.isFailure) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = result.exceptionOrNull()?.message ?: "Failed to open installer."
+            )
         }
     }
 

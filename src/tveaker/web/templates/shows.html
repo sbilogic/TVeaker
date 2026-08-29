@@ -6,7 +6,7 @@
 <div class="header-bar">
   <div>
     <h1 class="page-title">Tracked Shows</h1>
-    <p style="color: var(--text-secondary); margin-top: 4px;">Manage statuses, viewing paces, and specials inclusion</p>
+    <p style="color: var(--text-secondary); margin-top: 4px;">Manage statuses, viewing paces, and remaining watch runtimes</p>
   </div>
 </div>
 
@@ -25,6 +25,7 @@
       <tr>
         <th>Show</th>
         <th>Progress</th>
+        <th>Remaining Time</th>
         <th>Status</th>
         <th>Target Finish</th>
         <th>Pace (Eps/Wk)</th>
@@ -37,13 +38,21 @@
       <tr>
         <td>
           <div style="font-weight: 600; color: var(--text-primary);">{{ show.title }}</div>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">{{ show.year or '' }}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">{{ show.year or '' }} • {{ show.avg_runtime_minutes }}m/ep</div>
         </td>
         <td style="min-width: 140px;">
           <div style="font-size: 0.8rem; margin-bottom: 4px;">{{ show.watched_episodes }}/{{ show.total_episodes }} eps ({{ show.completion_percent }}%)</div>
           <div class="progress-bar-container" style="margin: 0; height: 6px;">
             <div class="progress-bar-fill" style="width: {{ show.completion_percent }}%;"></div>
           </div>
+        </td>
+        <td>
+          {% if show.remaining_episodes > 0 %}
+            <strong style="color: var(--accent);">{{ show.remaining_runtime_display }}</strong>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">{{ show.remaining_episodes }} eps left</div>
+          {% else %}
+            <span style="color: var(--success); font-size: 0.85rem;">0m left</span>
+          {% endif %}
         </td>
         <td>
           <select style="background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;" onchange="updateShowStatus({{ show.show_id }}, this.value)">
@@ -79,12 +88,13 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 32px;">
-          No shows found matching this filter.
+        <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;">
+          No shows found in this status category.
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
 {% endblock %}

@@ -4,6 +4,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import com.tveaker.app.data.model.*
 import okhttp3.OkHttpClient
+import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -43,6 +44,13 @@ interface TVeakerApiService {
         @Body request: SyncTriggerRequest
     ): SyncReportDto
 
+    @GET("api/v1/app/version")
+    suspend fun getAppVersion(): AppVersionDto
+
+    @Streaming
+    @GET("api/v1/app/download-apk")
+    suspend fun downloadApk(): ResponseBody
+
     companion object {
         const val DEFAULT_BASE_URL = "http://10.0.2.2:8000/"
 
@@ -54,11 +62,11 @@ interface TVeakerApiService {
             val client = OkHttpClient.Builder()
                 .addInterceptor(logging)
                 .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
                 .build()
 
             val moshi = Moshi.Builder()
-                .addLast(KotlinJsonAdapterFactory())
+                .add(KotlinJsonAdapterFactory())
                 .build()
 
             return Retrofit.Builder()

@@ -13,6 +13,8 @@ class TVeakerRepository(
         apiService = TVeakerApiService.create(formatted)
     }
 
+    fun getApiService(): TVeakerApiService = apiService
+
     suspend fun getHealth(): Result<HealthDto> = withContext(Dispatchers.IO) {
         runCatching { apiService.getHealth() }
     }
@@ -42,5 +44,9 @@ class TVeakerRepository(
 
     suspend fun triggerSync(mode: String = "incremental"): Result<SyncReportDto> = withContext(Dispatchers.IO) {
         runCatching { apiService.triggerSync(SyncTriggerRequest(mode)) }
+    }
+
+    suspend fun getAppVersion(): Result<AppVersionDto> = withContext(Dispatchers.IO) {
+        runCatching { apiService.getAppVersion() }
     }
 }

@@ -30,6 +30,8 @@ class ShowEstimate:
     watched_episodes: int
     remaining_episodes: int
     unwatched_minutes: int
+    avg_runtime_minutes: int
+    remaining_runtime_display: str
     completion_percent: float
     episodes_per_week: float
     pace_source: PaceSource
@@ -127,6 +129,8 @@ class ShowFinishEstimator:
                 watched_episodes=counts.watched_episodes,
                 remaining_episodes=counts.remaining_episodes,
                 unwatched_minutes=counts.unwatched_minutes,
+                avg_runtime_minutes=counts.avg_runtime_minutes,
+                remaining_runtime_display=counts.remaining_runtime_display,
                 completion_percent=completion_pct,
                 episodes_per_week=pace.episodes_per_week,
                 pace_source=pace.source,

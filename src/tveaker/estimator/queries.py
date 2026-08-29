@@ -7,7 +7,7 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from tveaker.models import Episode, TrackedShow, WatchEvent
+from tveaker.models import Episode, MediaItem, TrackedShow, WatchEvent
 
 
 def _ensure_utc(dt: datetime | None) -> datetime | None:
@@ -16,6 +16,22 @@ def _ensure_utc(dt: datetime | None) -> datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC)
+
+
+def format_runtime_duration(minutes: int) -> str:
+    """Format total runtime minutes into a clean human-readable duration string."""
+    if minutes <= 0:
+        return "0m"
+    if minutes < 60:
+        return f"{minutes}m"
+    if minutes < 1440:  # < 24 hours
+        hours = minutes // 60
+        mins = minutes % 60
+        return f"{hours}h {mins}m" if mins > 0 else f"{hours}h"
+    days = minutes // 1440
+    remaining_mins = minutes % 1440
+    hours = remaining_mins // 60
+    return f"{days}d {hours}h" if hours > 0 else f"{days}d"
 
 
 @dataclass(frozen=True)
@@ -27,6 +43,8 @@ class ShowCatalogCounts:
     unwatched_minutes: int
     unaired_episodes: int
     next_air_date: datetime | None
+    avg_runtime_minutes: int
+    remaining_runtime_display: str
 
 
 def get_show_episode_counts(
@@ -36,7 +54,7 @@ def get_show_episode_counts(
     now: datetime,
     include_specials: bool = False,
 ) -> ShowCatalogCounts:
-    """Compute watched, aired, remaining, and unaired episode metrics."""
+    """Compute watched, aired, remaining, and accurate unwatched runtime metrics."""
     now_utc = _ensure_utc(now) or datetime.now(UTC)
 
     # Base episode select
@@ -68,14 +86,41 @@ def get_show_episode_counts(
     unaired = 0
     future_air_dates: list[datetime] = []
 
-    # Get average runtime for fallback
-    known_runtimes = [e.runtime_minutes for e in episodes if e.runtime_minutes is not None]
-    avg_runtime = int(sum(known_runtimes) / len(known_runtimes)) if known_runtimes else 45
+    # Derive accurate average episode runtime
+    show = session.get(MediaItem, show_id)
+    known_runtimes = [
+        e.runtime_minutes
+        for e in episodes
+        if e.runtime_minutes is not None and e.runtime_minutes > 0
+    ]
+
+    if known_runtimes:
+        avg_runtime = int(sum(known_runtimes) / len(known_runtimes))
+    elif show and show.runtime_minutes and show.runtime_minutes > 0:
+        avg_runtime = show.runtime_minutes
+    elif show and show.genres:
+        g = set(show.genres)
+        if "Animation" in g or "Comedy" in g:
+            avg_runtime = 24
+        elif "Sci-Fi" in g or "Drama" in g or "Action" in g or "Crime" in g:
+            avg_runtime = 50
+        elif "Documentary" in g or "Reality" in g:
+            avg_runtime = 44
+        else:
+            avg_runtime = 42
+    else:
+        avg_runtime = 42
 
     for ep in episodes:
         is_watched = ep.id in watched_ep_ids
         if is_watched:
             watched += 1
+
+        ep_runtime = (
+            ep.runtime_minutes
+            if (ep.runtime_minutes is not None and ep.runtime_minutes > 0)
+            else avg_runtime
+        )
 
         # Check aired status with timezone normalization
         first_aired_utc = _ensure_utc(ep.first_aired)
@@ -83,19 +128,16 @@ def get_show_episode_counts(
             aired += 1
             if not is_watched:
                 remaining += 1
-                unwatched_mins += (
-                    ep.runtime_minutes if ep.runtime_minutes is not None else avg_runtime
-                )
+                unwatched_mins += ep_runtime
         else:
             unaired += 1
             future_air_dates.append(first_aired_utc)
             if not is_watched:
                 remaining += 1
-                unwatched_mins += (
-                    ep.runtime_minutes if ep.runtime_minutes is not None else avg_runtime
-                )
+                unwatched_mins += ep_runtime
 
     next_air = min(future_air_dates) if future_air_dates else None
+    runtime_display = format_runtime_duration(unwatched_mins)
 
     return ShowCatalogCounts(
         total_episodes=total,
@@ -105,6 +147,8 @@ def get_show_episode_counts(
         unwatched_minutes=unwatched_mins,
         unaired_episodes=unaired,
         next_air_date=next_air,
+        avg_runtime_minutes=avg_runtime,
+        remaining_runtime_display=runtime_display,
     )
 
 
@@ -123,89 +167,76 @@ def get_effective_pace(
     show_id: int,
     now: datetime,
 ) -> PaceResult:
-    """Calculate viewing pace using manual override or blended historical velocity."""
-    # 1. Check manual pace override
+    """Calculate effective velocity in episodes/week using blended 30d/90d windows."""
+    now_utc = _ensure_utc(now) or datetime.now(UTC)
+
+    # 1. Manual override takes highest priority
     tracked = session.get(TrackedShow, (account_id, show_id))
-    if (
-        tracked
-        and tracked.manual_episodes_per_week is not None
-        and tracked.manual_episodes_per_week > 0
-    ):
+    if tracked and tracked.manual_episodes_per_week is not None:
         return PaceResult(
             episodes_per_week=float(tracked.manual_episodes_per_week),
             source="manual",
         )
 
-    # 2. Show-specific historical pace
-    show_pace = _calculate_blended_pace(session, account_id, now, show_id=show_id)
-    if show_pace is not None and show_pace > 0:
-        return PaceResult(
-            episodes_per_week=show_pace,
-            source="show_blended",
-        )
-
-    # 3. Account-level historical pace across all shows
-    account_pace = _calculate_blended_pace(session, account_id, now, show_id=None)
-    if account_pace is not None and account_pace > 0:
-        return PaceResult(
-            episodes_per_week=account_pace,
-            source="account_blended",
-        )
-
-    # 4. Default fallback
-    return PaceResult(
-        episodes_per_week=2.0,
-        source="default_fallback",
+    # 2. Show-specific blended pace
+    show_pace = _compute_blended_pace_for_scope(
+        session=session,
+        account_id=account_id,
+        now=now_utc,
+        show_id=show_id,
     )
+    if show_pace is not None and show_pace > 0:
+        return PaceResult(episodes_per_week=show_pace, source="show_blended")
+
+    # 3. Account-wide blended pace
+    account_pace = _compute_blended_pace_for_scope(
+        session=session,
+        account_id=account_id,
+        now=now_utc,
+        show_id=None,
+    )
+    if account_pace is not None and account_pace > 0:
+        return PaceResult(episodes_per_week=account_pace, source="account_blended")
+
+    # 4. Default fallback: 1.0 ep/week
+    return PaceResult(episodes_per_week=1.0, source="default_fallback")
 
 
-def _calculate_blended_pace(
+def _compute_blended_pace_for_scope(
     session: Session,
     account_id: int,
     now: datetime,
     show_id: int | None = None,
 ) -> float | None:
-    """Calculate blended velocity over 30d, 90d, and all-time windows."""
-    now_utc = _ensure_utc(now) or datetime.now(UTC)
+    """Compute 70% 30d + 30% 90d blended pace for a show or whole account."""
+    cutoff_30d = now - timedelta(days=30)
+    cutoff_90d = now - timedelta(days=90)
 
+    # Base query for episode watch events
     base_stmt = (
         select(WatchEvent.watched_at)
         .join(Episode, WatchEvent.episode_id == Episode.id)
-        .where(WatchEvent.account_id == account_id)
+        .where(
+            WatchEvent.account_id == account_id,
+            WatchEvent.episode_id.isnot(None),
+            WatchEvent.watched_at >= cutoff_90d,
+            WatchEvent.watched_at <= now,
+        )
     )
     if show_id is not None:
         base_stmt = base_stmt.where(Episode.show_id == show_id)
 
-    raw_watch_times = session.execute(base_stmt).scalars().all()
-    watch_times: list[datetime] = []
-    for raw in raw_watch_times:
-        normalized = _ensure_utc(raw)
-        if normalized is not None:
-            watch_times.append(normalized)
+    watched_timestamps = session.execute(base_stmt).scalars().all()
 
-    if not watch_times:
+    if not watched_timestamps:
         return None
 
-    # Filter by windows
-    cutoff_30d = now_utc - timedelta(days=30)
-    cutoff_90d = now_utc - timedelta(days=90)
+    count_30d = sum(1 for ts in watched_timestamps if (_ensure_utc(ts) or now) >= cutoff_30d)
+    count_90d = len(watched_timestamps)
 
-    events_30d = [t for t in watch_times if t >= cutoff_30d]
-    events_90d = [t for t in watch_times if t >= cutoff_90d]
-    events_all = watch_times
+    pace_30d = (count_30d / 30.0) * 7.0
+    pace_90d = (count_90d / 90.0) * 7.0
 
-    pace_30d = len(events_30d) / (30.0 / 7.0)
-    pace_90d = len(events_90d) / (90.0 / 7.0)
-
-    earliest = min(watch_times)
-    span_days = max((now_utc - earliest).days, 7)
-    pace_all = len(events_all) / (span_days / 7.0)
-
-    if events_30d:
-        blended = (0.60 * pace_30d) + (0.30 * pace_90d) + (0.10 * pace_all)
-    elif events_90d:
-        blended = (0.70 * pace_90d) + (0.30 * pace_all)
-    else:
-        blended = pace_all
-
+    # 70% weight to 30d, 30% weight to 90d
+    blended = (0.7 * pace_30d) + (0.3 * pace_90d)
     return round(blended, 2)
