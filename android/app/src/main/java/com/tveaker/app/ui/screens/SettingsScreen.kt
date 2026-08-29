@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,7 +41,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Settings & System", fontWeight = FontWeight.Black, fontSize = 20.sp, color = TextPrimary)
+                        Text("Settings & System", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
                         Text("OTA Updates & Host Configuration", fontSize = 11.sp, color = TextMuted)
                     }
                 },
@@ -60,18 +59,18 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
                 .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
-            // Stripe OTA Update Card
+            // OTA Update Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = BgSurface,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(16.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -88,8 +87,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, tint = StripeCyan, modifier = Modifier.size(18.dp))
                             }
                             Column {
-                                Text("OTA Updates", fontWeight = FontWeight.Black, color = TextPrimary, fontSize = 16.sp)
-                                Text("Instant over-the-air distribution", color = TextMuted, fontSize = 11.sp)
+                                Text("OTA Updates", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 15.sp)
+                                Text("Instant in-app distribution", color = TextMuted, fontSize = 11.sp)
                             }
                         }
                         Surface(
@@ -98,29 +97,28 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             border = androidx.compose.foundation.BorderStroke(1.dp, StripeIris.copy(alpha = 0.35f))
                         ) {
                             Text(
-                                text = "v${state.currentVersionName} (Build ${state.currentVersionCode})",
+                                text = "v${state.currentVersionName} (b${state.currentVersionCode})",
                                 color = StripeCyan,
-                                fontSize = 10.sp,
-                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     if (state.serverVersionInfo != null) {
                         Surface(
                             color = if (state.isNewUpdateAvailable) StripeViolet.copy(alpha = 0.15f) else BgSurfaceElevated,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
                                 if (state.isNewUpdateAvailable) StripeViolet.copy(alpha = 0.45f) else BorderSubtle
                             )
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         Icons.Default.AutoAwesome,
@@ -129,7 +127,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Text(
-                                        text = if (state.isNewUpdateAvailable) "⚡ Update Ready: v${state.serverVersionInfo?.versionName} (Build ${state.serverVersionInfo?.versionCode})" else "✓ Server Build: v${state.serverVersionInfo?.versionName} (Build ${state.serverVersionInfo?.versionCode})",
+                                        text = if (state.isNewUpdateAvailable) "⚡ Update Ready: v${state.serverVersionInfo?.versionName} (b${state.serverVersionInfo?.versionCode})" else "✓ Server Build: v${state.serverVersionInfo?.versionName} (b${state.serverVersionInfo?.versionCode})",
                                         fontWeight = FontWeight.Bold,
                                         color = if (state.isNewUpdateAvailable) StripeCyan else TextPrimary,
                                         fontSize = 13.sp
@@ -140,7 +138,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                                         text = state.serverVersionInfo?.changelog ?: "",
                                         color = TextSecondary,
                                         fontSize = 11.sp,
-                                        modifier = Modifier.padding(top = 6.dp)
+                                        modifier = Modifier.padding(top = 4.dp)
                                     )
                                 }
                                 if (state.serverVersionInfo?.apkSizeBytes != null) {
@@ -148,7 +146,6 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                                     Text(
                                         text = "Size: $sizeMb MB",
                                         color = TextMuted,
-                                        fontFamily = FontFamily.Monospace,
                                         fontSize = 10.sp,
                                         modifier = Modifier.padding(top = 4.dp)
                                     )
@@ -157,14 +154,14 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         }
                     } else {
                         Text(
-                            text = "Could not connect to update server. Verify connection to Wi-Fi LAN.",
+                            text = "Could not connect to update server. Check Wi-Fi connection.",
                             color = TextMuted,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     if (state.isNewUpdateAvailable) {
                         if (state.downloadProgress != null) {
@@ -179,7 +176,6 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                                     text = "Downloading APK: ${((state.downloadProgress ?: 0f) * 100).toInt()}%",
                                     color = TextSecondary,
                                     fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
@@ -187,8 +183,8 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             Button(
                                 onClick = { viewModel.startDownloadUpdate(context) },
                                 colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth().height(42.dp)
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().height(40.dp)
                             ) {
                                 Text("Download & Install Update", color = TextPrimary, fontWeight = FontWeight.Bold)
                             }
@@ -197,9 +193,9 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         Button(
                             onClick = { viewModel.checkForUpdates() },
                             colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                            modifier = Modifier.fillMaxWidth().height(42.dp)
+                            modifier = Modifier.fillMaxWidth().height(40.dp)
                         ) {
                             Text("Check for Updates", color = TextPrimary, fontWeight = FontWeight.Medium)
                         }
@@ -207,14 +203,14 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 }
             }
 
-            // Stripe Connection Settings Card
+            // Connection Gateway Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = BgSurface,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(16.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -226,12 +222,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                             Icon(Icons.Default.Sensors, contentDescription = null, tint = StripeEmerald, modifier = Modifier.size(18.dp))
                         }
                         Column {
-                            Text("Host Gateway", fontWeight = FontWeight.Black, color = TextPrimary, fontSize = 16.sp)
-                            Text("Local network API endpoint", color = TextMuted, fontSize = 11.sp)
+                            Text("Host Gateway", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 15.sp)
+                            Text("Local network backend URL", color = TextMuted, fontSize = 11.sp)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedTextField(
                         value = urlInput,
@@ -239,7 +235,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         label = { Text("Server Base URL") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -250,12 +246,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Preset connection shortcuts
-                    Text("QUICK PRESETS", fontSize = 9.sp, color = StripeCyan, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                    Text("PRESETS", fontSize = 10.sp, color = StripeCyan, fontWeight = FontWeight.Bold)
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Surface(
@@ -297,13 +293,13 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Button(
                         onClick = { viewModel.setBaseUrl(urlInput) },
                         colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth().height(42.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(40.dp)
                     ) {
                         Text("Apply & Save Gateway", color = TextPrimary, fontWeight = FontWeight.Bold)
                     }

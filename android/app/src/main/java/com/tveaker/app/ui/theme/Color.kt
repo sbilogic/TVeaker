@@ -3,57 +3,57 @@ package com.tveaker.app.ui.theme
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-// Stripe Signature Deep Canvas Palette
-val BgBase = Color(0xFF070913)
-val BgPrimary = Color(0xFF0B0E1D)
-val BgSurface = Color(0xE610152B)
-val BgSurfaceElevated = Color(0xF2161E38)
-val BgSurfaceHover = Color(0xFF1E284A)
-val BgCardGlass = Color(0xCC0E1326)
+// Stripe Solid Premium Palette (No murky semi-transparencies)
+val BgBase = Color(0xFF0B0F19)
+val BgPrimary = Color(0xFF0B0F19)
+val BgSurface = Color(0xFF111827)
+val BgSurfaceElevated = Color(0xFF1E293B)
+val BgSurfaceHover = Color(0xFF334155)
+val BgCardGlass = Color(0xFF111827)
 
-// Stripe Crisp Typography
-val TextPrimary = Color(0xFFFFFFFF)
+// Crisp Typography
+val TextPrimary = Color(0xFFF8FAFC)
 val TextSecondary = Color(0xFF94A3B8)
 val TextMuted = Color(0xFF64748B)
 val TextSubtle = Color(0xFF475569)
 
-// Stripe Iconic Luminous Accents
+// Vibrant Luminous Accents
 val StripeIris = Color(0xFF635BFF)
 val StripeCyan = Color(0xFF00D4FF)
-val StripeViolet = Color(0xFF7A73FF)
-val StripeEmerald = Color(0xFF00D97E)
-val StripeAmber = Color(0xFFFFB800)
-val StripeRose = Color(0xFFFF3B70)
+val StripeViolet = Color(0xFF818CF8)
+val StripeEmerald = Color(0xFF10B981)
+val StripeAmber = Color(0xFFF59E0B)
+val StripeRose = Color(0xFFF43F5E)
 val StripePink = Color(0xFFEC4899)
 
-// Legacy alias mappings for backward compatibility
+// Legacy alias mappings
 val Accent = StripeIris
 val AccentCyan = StripeCyan
 val AccentIndigo = StripeIris
 val AccentPurple = StripeViolet
-val AccentDark = Color(0xFF4B45C6)
+val AccentDark = Color(0xFF4338CA)
 
 val Success = StripeEmerald
 val Warning = StripeAmber
 val Danger = StripeRose
 
-// Stripe Specular Hairline Borders & Drop Shadows
-val Border = Color(0xFF1E2942)
-val BorderSubtle = Color(0x18FFFFFF)
-val BorderMedium = Color(0x28FFFFFF)
-val BorderBright = Color(0x45FFFFFF)
-val BorderGlowIris = Color(0x40635BFF)
-val BorderGlowCyan = Color(0x4000D4FF)
+// Borders & Dividers
+val Border = Color(0xFF1E293B)
+val BorderSubtle = Color(0xFF334155)
+val BorderMedium = Color(0xFF475569)
+val BorderBright = Color(0xFF64748B)
+val BorderGlowIris = StripeIris
+val BorderGlowCyan = StripeCyan
 
-// Stripe Multi-Stop Linear & Sweep Gradients
-val StripeGradientBrush = Brush.linearGradient(
-    colors = listOf(StripeIris, StripeViolet, StripeCyan)
+// Gradient Brushes
+val StripeGradientBrush = Brush.horizontalGradient(
+    colors = listOf(StripeIris, StripeCyan)
 )
 
-val StripeSecondaryGradientBrush = Brush.linearGradient(
+val StripeSecondaryGradientBrush = Brush.horizontalGradient(
     colors = listOf(StripeIris, StripePink)
 )
 
 val StripeCardMeshBrush = Brush.verticalGradient(
-    colors = listOf(Color(0x1A635BFF), Color(0x0A00D4FF), Color(0x00000000))
+    colors = listOf(Color(0xFF1E1B4B), Color(0xFF111827))
 )

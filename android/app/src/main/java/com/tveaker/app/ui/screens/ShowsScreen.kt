@@ -19,7 +19,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,7 +53,7 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
             TopAppBar(
                 title = {
                     Column {
-                        Text("Tracked Shows", fontWeight = FontWeight.Black, fontSize = 20.sp, color = TextPrimary)
+                        Text("Tracked Shows", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
                         Text("${filteredShows.size} shows cataloged", fontSize = 11.sp, color = TextMuted)
                     }
                 },
@@ -72,7 +71,7 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            // Stripe Search Bar with Glowing Focus Outline
+            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -81,8 +80,8 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                shape = RoundedCornerShape(14.dp),
+                    .padding(vertical = 6.dp),
+                shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
@@ -93,28 +92,28 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                 )
             )
 
-            // Stripe Status Filter Segmented Pills
+            // Status Filter Pills
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(bottom = 10.dp)
             ) {
                 items(statuses) { (statusValue, label) ->
                     val isSelected = state.selectedStatus == statusValue
                     Surface(
                         color = if (isSelected) StripeIris else BgSurface,
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            if (isSelected) StripeCyan.copy(alpha = 0.5f) else BorderSubtle
+                            if (isSelected) StripeCyan else BorderSubtle
                         ),
                         modifier = Modifier.clickable { viewModel.setStatusFilter(statusValue) }
                     ) {
                         Text(
                             text = label,
                             fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) TextPrimary else TextSecondary,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
                     }
                 }
@@ -133,15 +132,15 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                 ) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = BgSurface),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(16.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
-                            modifier = Modifier.padding(24.dp),
+                            modifier = Modifier.padding(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("📡 Connection Failed", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
+                            Text("📡 Connection Failed", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
                             Text(
                                 text = "Cannot reach server at ${state.currentServerUrl}",
                                 fontSize = 12.sp,
@@ -153,7 +152,7 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                             Button(
                                 onClick = { viewModel.setServerUrl("http://192.168.1.33:8000/") },
                                 colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("📱 Wi-Fi LAN (192.168.1.33:8000)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -163,17 +162,15 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
 
                             OutlinedButton(
                                 onClick = { viewModel.setServerUrl("http://10.0.2.2:8000/") },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("💻 Emulator (10.0.2.2:8000)", color = TextPrimary, fontSize = 12.sp)
                             }
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                            TextButton(
-                                onClick = { viewModel.loadShows() }
-                            ) {
+                            TextButton(onClick = { viewModel.loadShows() }) {
                                 Text("🔄 Retry Connection", color = StripeCyan, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -185,11 +182,11 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                 }
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(filteredShows) { show ->
-                        StripeShowDetailCard(
+                        CleanShowDetailCard(
                             show = show,
                             onStatusChange = { newStatus -> viewModel.updateShowStatus(show.showId, newStatus) },
                             onOpenEpisodes = { viewModel.loadUnwatchedEpisodes(show.showId) },
@@ -216,7 +213,7 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
 }
 
 @Composable
-fun StripeShowDetailCard(
+fun CleanShowDetailCard(
     show: ShowEstimateDto,
     onStatusChange: (String) -> Unit,
     onOpenEpisodes: () -> Unit,
@@ -229,10 +226,10 @@ fun StripeShowDetailCard(
             .fillMaxWidth()
             .clickable { onOpenEpisodes() },
         color = BgSurface,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(14.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -241,7 +238,7 @@ fun StripeShowDetailCard(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (!show.posterUrl.isNullOrEmpty()) {
                         AsyncImage(
@@ -252,24 +249,24 @@ fun StripeShowDetailCard(
                             contentDescription = show.title,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(width = 46.dp, height = 68.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
+                                .size(width = 44.dp, height = 64.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(width = 46.dp, height = 68.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .size(width = 44.dp, height = 64.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(StripeIris.copy(alpha = 0.15f))
-                                .border(1.dp, StripeIris.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                                .border(1.dp, StripeIris.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = show.title.take(1),
-                                fontWeight = FontWeight.Black,
+                                fontWeight = FontWeight.Bold,
                                 color = StripeCyan,
-                                fontSize = 18.sp
+                                fontSize = 16.sp
                             )
                         }
                     }
@@ -278,7 +275,7 @@ fun StripeShowDetailCard(
                         Text(
                             text = show.title,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             color = TextPrimary
                         )
                         Text(
@@ -289,7 +286,7 @@ fun StripeShowDetailCard(
                     }
                 }
 
-                // Status Tag Pill with Colored Indicator Dot
+                // Status Tag Dropdown
                 Box {
                     val statusDotColor = when (show.status) {
                         "watching" -> StripeEmerald
@@ -301,14 +298,14 @@ fun StripeShowDetailCard(
 
                     Surface(
                         color = BgSurfaceElevated,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                         modifier = Modifier.clickable { expanded = true }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -320,7 +317,7 @@ fun StripeShowDetailCard(
                                 text = show.status.replaceFirstChar { it.uppercase() },
                                 color = TextPrimary,
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -344,22 +341,15 @@ fun StripeShowDetailCard(
                 }
             }
 
-            // Dual-Tone Gradient Progress Bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .padding(top = 8.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(Border)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth((show.completionPercent / 100f).coerceIn(0.01f, 1f))
-                        .fillMaxHeight()
-                        .background(StripeGradientBrush)
-                )
-            }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Progress Bar
+            LinearProgressIndicator(
+                progress = { (show.completionPercent / 100f).coerceIn(0.01f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                color = StripeCyan,
+                trackColor = Border
+            )
 
             Row(
                 modifier = Modifier
@@ -377,12 +367,11 @@ fun StripeShowDetailCard(
                 Text(
                     text = "${show.completionPercent.toInt()}% Done",
                     color = TextMuted,
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace
+                    fontSize = 10.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -390,21 +379,20 @@ fun StripeShowDetailCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (show.estimatedFinishDate != null) "Target: ${show.estimatedFinishDate.substring(0, minOf(10, show.estimatedFinishDate.length))}" else if (show.isCaughtUp) "✓ Caught up" else "In Progress",
+                    text = if (show.estimatedFinishDate != null) "Finish: ${show.estimatedFinishDate.take(10)}" else if (show.isCaughtUp) "✓ Caught up" else "In Progress",
                     color = if (show.isCaughtUp) StripeEmerald else TextSecondary,
                     fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Medium
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (show.remainingEpisodes > 0) {
                         Button(
                             onClick = onQuickScrobble,
                             colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp),
-                            shape = RoundedCornerShape(8.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.height(26.dp),
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Text("+1 Ep", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
@@ -412,12 +400,12 @@ fun StripeShowDetailCard(
                     Button(
                         onClick = onOpenEpisodes,
                         colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(26.dp),
+                        shape = RoundedCornerShape(6.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                     ) {
-                        Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp)
+                        Text("Episodes", color = TextPrimary, fontSize = 11.sp)
                     }
                 }
             }
