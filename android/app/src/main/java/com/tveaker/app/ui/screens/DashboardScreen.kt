@@ -6,17 +6,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,17 +47,43 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("TVeaker Pro", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
-                        Text("Deterministic Watch Tracker", fontSize = 11.sp, color = TextMuted)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(StripeGradientBrush),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Tv, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        }
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("TVeaker", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextPrimary)
+                                Surface(
+                                    color = StripeIris.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(4.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, StripeIris.copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        text = "PRO",
+                                        color = StripeCyan,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                            Text("Real-time Watch Analytics", fontSize = 10.sp, color = TextMuted, fontWeight = FontWeight.Medium)
+                        }
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.triggerSync("incremental") }) {
                         if (state.isSyncing) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = AccentCyan, strokeWidth = 2.dp)
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = StripeCyan, strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Refresh, contentDescription = "Sync", tint = AccentCyan)
+                            Icon(Icons.Default.Refresh, contentDescription = "Sync", tint = StripeCyan)
                         }
                     }
                 },
@@ -60,7 +97,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
     ) { padding ->
         if (state.isLoading && state.activeShows.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = AccentCyan)
+                CircularProgressIndicator(color = StripeIris)
             }
         } else if (state.errorMessage != null && state.activeShows.isEmpty()) {
             Box(
@@ -80,30 +117,22 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                         modifier = Modifier.padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("📡 Server Connection", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = TextPrimary)
+                        Text("📡 Connection Diagnostic", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
                         Text(
-                            text = "Cannot reach TVeaker backend at ${state.currentServerUrl}",
+                            text = "Cannot connect to TVeaker backend at ${state.currentServerUrl}",
                             fontSize = 12.sp,
                             color = TextMuted,
                             modifier = Modifier.padding(top = 6.dp, bottom = 16.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
 
-                        Text(
-                            text = "Select your connection mode:",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = AccentCyan,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
                         Button(
                             onClick = { viewModel.setServerUrl("http://192.168.1.33:8000/") },
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                            colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("📱 Wi-Fi LAN (192.168.1.33:8000)", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("📱 Wi-Fi LAN (192.168.1.33:8000)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -121,7 +150,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                         TextButton(
                             onClick = { viewModel.loadDashboardData() }
                         ) {
-                            Text("🔄 Retry Connection", color = AccentPurple, fontWeight = FontWeight.Bold)
+                            Text("🔄 Retry Connection", color = StripeCyan, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -137,10 +166,10 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                 // OTA Update Available Banner
                 if (state.isNewUpdateAvailable && state.serverVersionInfo != null) {
                     item {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = AccentPurple.copy(alpha = 0.15f)),
-                            shape = RoundedCornerShape(14.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentPurple.copy(alpha = 0.4f)),
+                        Surface(
+                            color = BgSurfaceElevated,
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, StripeViolet.copy(alpha = 0.5f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -148,48 +177,54 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("⚡ New Update Available (v${state.serverVersionInfo?.versionName})", fontWeight = FontWeight.Bold, color = AccentPurple, fontSize = 13.sp)
-                                    Text(state.serverVersionInfo?.changelog ?: "New features and performance improvements", color = TextSecondary, fontSize = 11.sp, maxLines = 1)
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(StripeViolet.copy(alpha = 0.2f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = StripeCyan, modifier = Modifier.size(18.dp))
+                                    }
+                                    Column {
+                                        Text("⚡ Update Available: v${state.serverVersionInfo?.versionName}", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 13.sp)
+                                        Text(state.serverVersionInfo?.changelog ?: "New enhancements ready to install", color = TextSecondary, fontSize = 11.sp, maxLines = 1)
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Apple TV+ Style Hero Spotlight Billboard
+                // Stripe Aurora Spotlight Hero Card
                 if (state.activeShows.isNotEmpty()) {
                     val heroShow = state.activeShows[0]
                     item {
-                        Card(
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
                             shape = RoundedCornerShape(24.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderMedium),
-                            colors = CardDefaults.cardColors(containerColor = BgSurfaceElevated)
+                            color = BgSurfaceElevated
                         ) {
                             Box(modifier = Modifier.fillMaxWidth()) {
+                                // Multi-stop Aurora Glow
                                 Box(
                                     modifier = Modifier
                                         .matchParentSize()
-                                        .background(
-                                            Brush.verticalGradient(
-                                                colors = listOf(
-                                                    AccentCyan.copy(alpha = 0.04f),
-                                                    AccentPurple.copy(alpha = 0.04f)
-                                                )
-                                            )
-                                        )
+                                        .background(StripeCardMeshBrush)
                                 )
 
                                 Row(
                                     modifier = Modifier
-                                        .padding(16.dp)
+                                        .padding(18.dp)
                                         .fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    // Poster artwork with hairline specular border
                                     if (!heroShow.posterUrl.isNullOrEmpty()) {
                                         AsyncImage(
                                             model = ImageRequest.Builder(LocalContext.current)
@@ -199,39 +234,42 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                                             contentDescription = heroShow.title,
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
-                                                .size(width = 72.dp, height = 108.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
+                                                .size(width = 78.dp, height = 116.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .border(1.dp, BorderMedium, RoundedCornerShape(12.dp))
                                                 .clickable { viewModel.loadUnwatchedEpisodes(heroShow.showId) }
                                         )
                                     }
 
                                     Column(modifier = Modifier.weight(1f)) {
                                         Surface(
-                                            color = AccentCyan.copy(alpha = 0.15f),
+                                            color = StripeIris.copy(alpha = 0.2f),
                                             shape = RoundedCornerShape(6.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, StripeIris.copy(alpha = 0.4f)),
                                             modifier = Modifier.padding(bottom = 6.dp)
                                         ) {
                                             Text(
-                                                text = "★ IN-PROGRESS SPOTLIGHT",
-                                                color = AccentCyan,
+                                                text = "⚡ ACTIVE SPOTLIGHT",
+                                                color = StripeCyan,
                                                 fontSize = 8.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                fontWeight = FontWeight.Black,
+                                                letterSpacing = 1.sp,
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                             )
                                         }
 
                                         Text(
                                             text = heroShow.title,
-                                            fontWeight = FontWeight.ExtraBold,
+                                            fontWeight = FontWeight.Black,
                                             fontSize = 18.sp,
+                                            letterSpacing = (-0.4).sp,
                                             color = TextPrimary,
                                             maxLines = 1,
                                             modifier = Modifier.clickable { viewModel.loadUnwatchedEpisodes(heroShow.showId) }
                                         )
 
                                         Text(
-                                            text = "${heroShow.watchedEpisodes}/${heroShow.totalEpisodes} episodes • ${heroShow.remainingRuntimeDisplay ?: "${heroShow.unwatchedMinutes}m left"}",
+                                            text = "${heroShow.watchedEpisodes}/${heroShow.totalEpisodes} eps • ${heroShow.remainingRuntimeDisplay ?: "${heroShow.unwatchedMinutes}m remaining"}",
                                             color = TextSecondary,
                                             fontSize = 11.sp,
                                             modifier = Modifier.padding(top = 2.dp)
@@ -242,57 +280,61 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             Button(
                                                 onClick = { viewModel.quickScrobble(heroShow.showId) },
-                                                colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                                modifier = Modifier.height(28.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(30.dp),
                                                 shape = RoundedCornerShape(8.dp)
                                             ) {
-                                                Text("+1 Ep", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp), tint = TextPrimary)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("+1 Ep", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                             }
 
                                             OutlinedButton(
                                                 onClick = { viewModel.loadUnwatchedEpisodes(heroShow.showId) },
                                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                                modifier = Modifier.height(28.dp),
+                                                modifier = Modifier.height(30.dp),
                                                 shape = RoundedCornerShape(8.dp),
                                                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                                             ) {
-                                                Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp)
+                                                Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                                             }
                                         }
                                     }
 
+                                    // Tabular Circular Progress Ring
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier.size(64.dp)
                                     ) {
-                                        androidx.compose.foundation.Canvas(modifier = Modifier.size(56.dp)) {
+                                        androidx.compose.foundation.Canvas(modifier = Modifier.size(58.dp)) {
                                             drawArc(
                                                 color = Border,
                                                 startAngle = 0f,
                                                 sweepAngle = 360f,
                                                 useCenter = false,
-                                                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5.dp.toPx())
+                                                style = Stroke(width = 5.dp.toPx())
                                             )
                                             drawArc(
-                                                brush = Brush.sweepGradient(listOf(AccentCyan, AccentIndigo, AccentPurple)),
+                                                brush = Brush.sweepGradient(listOf(StripeIris, StripeViolet, StripeCyan, StripeIris)),
                                                 startAngle = -90f,
                                                 sweepAngle = (heroShow.completionPercent / 100f) * 360f,
                                                 useCenter = false,
-                                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                style = Stroke(
                                                     width = 5.dp.toPx(),
-                                                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                                    cap = StrokeCap.Round
                                                 )
                                             )
                                         }
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text(
                                                 text = "${heroShow.completionPercent.toInt()}%",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Black,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.sp,
                                                 color = TextPrimary
                                             )
-                                            Text("Done", fontSize = 7.sp, color = TextMuted)
+                                            Text("DONE", fontSize = 7.sp, fontWeight = FontWeight.Bold, color = TextMuted, letterSpacing = 0.5.sp)
                                         }
                                     }
                                 }
@@ -301,7 +343,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                     }
                 }
 
-                // Stats Overview Grid
+                // Stripe Metric Bento Grid
                 item {
                     val totalEpsLeft = state.activeShows.sumOf { it.remainingEpisodes }
                     val totalMins = state.activeShows.sumOf { it.unwatchedMinutes }
@@ -314,32 +356,55 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                             .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Card(
+                        Surface(
                             modifier = Modifier.weight(1f),
-                            colors = CardDefaults.cardColors(containerColor = BgSurface),
-                            shape = RoundedCornerShape(16.dp),
+                            color = BgSurface,
+                            shape = RoundedCornerShape(18.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text("ACTIVE SERIES", fontSize = 9.sp, color = AccentCyan, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                                Text("${state.activeShows.size}", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
-                                Text("$totalEpsLeft eps remaining", fontSize = 11.sp, color = TextMuted)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("ACTIVE PIPELINE", fontSize = 9.sp, color = StripeCyan, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = StripeCyan, modifier = Modifier.size(14.dp))
+                                }
+                                Text(
+                                    text = "${state.activeShows.size}",
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                                Text("$totalEpsLeft unwatched episodes", fontSize = 11.sp, color = TextMuted)
                             }
                         }
 
-                        Card(
+                        Surface(
                             modifier = Modifier.weight(1f),
-                            colors = CardDefaults.cardColors(containerColor = BgSurface),
-                            shape = RoundedCornerShape(16.dp),
+                            color = BgSurface,
+                            shape = RoundedCornerShape(18.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text("REMAINING TIME", fontSize = 9.sp, color = AccentPurple, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("CLEARANCE TIME", fontSize = 9.sp, color = StripeViolet, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                                    Icon(Icons.Default.Schedule, contentDescription = null, tint = StripeViolet, modifier = Modifier.size(14.dp))
+                                }
                                 Text(
-                                    if (totalDays > 0) "${totalDays}d ${totalHours % 24}h" else "${totalHours}h",
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = TextPrimary
+                                    text = if (totalDays > 0) "${totalDays}d ${totalHours % 24}h" else "${totalHours}h",
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Black,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(vertical = 2.dp)
                                 )
                                 Text("$totalMins total minutes", fontSize = 11.sp, color = TextMuted)
                             }
@@ -347,20 +412,20 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                     }
                 }
 
-                // Active Watching Shows Header
+                // In-Progress Section Header
                 item {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Active In-Progress", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
-                        Text("${state.activeShows.size} shows", fontSize = 12.sp, color = AccentCyan)
+                        Text("In-Progress Shows", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, color = TextPrimary)
+                        Text("${state.activeShows.size} tracked", fontSize = 11.sp, color = StripeCyan, fontWeight = FontWeight.Bold)
                     }
                 }
 
                 items(state.activeShows) { show ->
-                    ShowEstimateCard(
+                    StripeShowCard(
                         show = show,
                         onClick = { viewModel.loadUnwatchedEpisodes(show.showId) },
                         onQuickScrobble = { viewModel.quickScrobble(show.showId) }
@@ -372,12 +437,13 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
         }
 
         // Unwatched Episodes Bottom Sheet
-        if (state.selectedShowUnwatched != null) {
+        val unwatchedData = state.selectedShowUnwatched
+        if (unwatchedData != null) {
             UnwatchedEpisodesBottomSheet(
-                data = state.selectedShowUnwatched!!,
+                data = unwatchedData,
                 onDismiss = { viewModel.dismissEpisodesSheet() },
                 onWatchEpisode = { epId ->
-                    viewModel.markEpisodeWatched(state.selectedShowUnwatched!!.showId, epId)
+                    viewModel.markEpisodeWatched(unwatchedData.showId, epId)
                 }
             )
         }
@@ -385,26 +451,26 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
 }
 
 @Composable
-fun ShowEstimateCard(
+fun StripeShowCard(
     show: ShowEstimateDto,
     onClick: () -> Unit,
     onQuickScrobble: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = BgSurface),
-        shape = RoundedCornerShape(16.dp),
+        color = BgSurface,
+        shape = RoundedCornerShape(18.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Poster Artwork or Monogram
+                // High-res Poster Artwork
                 if (!show.posterUrl.isNullOrEmpty()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -414,42 +480,36 @@ fun ShowEstimateCard(
                         contentDescription = show.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(width = 44.dp, height = 66.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                            .size(width = 46.dp, height = 68.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(width = 44.dp, height = 66.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(AccentCyan.copy(alpha = 0.12f))
-                            .border(1.dp, AccentCyan.copy(alpha = 0.25f), RoundedCornerShape(8.dp)),
+                            .size(width = 46.dp, height = 68.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(StripeIris.copy(alpha = 0.15f))
+                            .border(1.dp, StripeIris.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = show.title.take(1),
-                            fontWeight = FontWeight.ExtraBold,
-                            color = AccentCyan,
+                            fontWeight = FontWeight.Black,
+                            color = StripeCyan,
                             fontSize = 18.sp
                         )
                     }
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = show.title,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextPrimary,
-                            maxLines = 1
-                        )
-                    }
+                    Text(
+                        text = show.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = TextPrimary,
+                        maxLines = 1
+                    )
 
                     Text(
                         text = "${show.watchedEpisodes}/${show.totalEpisodes} eps • ${show.avgRuntimeMinutes ?: 42}m avg • ${show.episodesPerWeek} eps/wk",
@@ -469,9 +529,9 @@ fun ShowEstimateCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(show.completionPercent / 100f)
+                                .fillMaxWidth((show.completionPercent / 100f).coerceIn(0.01f, 1f))
                                 .fillMaxHeight()
-                                .background(Brush.horizontalGradient(listOf(AccentCyan, AccentIndigo)))
+                                .background(StripeGradientBrush)
                         )
                     }
 
@@ -481,10 +541,10 @@ fun ShowEstimateCard(
                             .padding(top = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("${show.completionPercent}%", color = TextMuted, fontSize = 10.sp)
+                        Text("${show.completionPercent.toInt()}%", color = TextMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                         Text(
-                            text = if (show.remainingEpisodes > 0) "${show.remainingEpisodes} left (${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"})" else "✓ Caught up",
-                            color = AccentCyan,
+                            text = if (show.remainingEpisodes > 0) "${show.remainingEpisodes} left (${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"})" else "✓ Complete",
+                            color = StripeCyan,
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.sp
                         )
@@ -502,8 +562,9 @@ fun ShowEstimateCard(
             ) {
                 Text(
                     text = if (show.estimatedFinishDate != null) "Target: ${show.estimatedFinishDate.substring(0, minOf(10, show.estimatedFinishDate.length))}" else if (show.isCaughtUp) "✓ Caught up" else "In Progress",
-                    color = if (show.isCaughtUp) Success else TextSecondary,
+                    color = if (show.isCaughtUp) StripeEmerald else TextSecondary,
                     fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.SemiBold
                 )
 
@@ -511,12 +572,12 @@ fun ShowEstimateCard(
                     if (show.remainingEpisodes > 0) {
                         Button(
                             onClick = onQuickScrobble,
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                            colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                             modifier = Modifier.height(28.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("+1 Ep", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text("+1 Ep", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                     Button(
@@ -524,7 +585,8 @@ fun ShowEstimateCard(
                         colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         modifier = Modifier.height(28.dp),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                     ) {
                         Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp)
                     }
@@ -567,14 +629,14 @@ fun UnwatchedEpisodesBottomSheet(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(width = 48.dp, height = 72.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(10.dp))
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(data.title, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = TextPrimary)
+                    Text(data.title, fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextPrimary)
                     Text(
-                        "${data.remainingEpisodes} episodes left • ~${data.unwatchedMinutes / 60}h remaining",
-                        color = AccentCyan,
+                        "${data.remainingEpisodes} episodes left • ~${data.unwatchedMinutes / 60}h total",
+                        color = StripeCyan,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -590,7 +652,7 @@ fun UnwatchedEpisodesBottomSheet(
                         .padding(vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("🎉 Completely caught up with all episodes!", color = Success, fontWeight = FontWeight.Bold)
+                    Text("🎉 Completely caught up with all episodes!", color = StripeEmerald, fontWeight = FontWeight.Bold)
                 }
             } else {
                 LazyColumn(
@@ -602,7 +664,7 @@ fun UnwatchedEpisodesBottomSheet(
                     items(data.unwatchedEpisodes) { ep ->
                         Surface(
                             color = BgSurface,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -615,23 +677,25 @@ fun UnwatchedEpisodesBottomSheet(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Surface(
-                                            color = AccentCyan.copy(alpha = 0.15f),
-                                            shape = RoundedCornerShape(4.dp)
+                                            color = StripeIris.copy(alpha = 0.2f),
+                                            shape = RoundedCornerShape(4.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, StripeIris.copy(alpha = 0.4f))
                                         ) {
                                             Text(
                                                 text = "S${ep.seasonNumber.toString().padStart(2, '0')}E${ep.episodeNumber.toString().padStart(2, '0')}",
-                                                color = AccentCyan,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.ExtraBold,
+                                                color = StripeCyan,
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.Black,
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
                                         }
                                         Text(
-                                            text = ep.title ?: "Untitled",
+                                            text = ep.title ?: "Untitled Episode",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp,
                                             color = TextPrimary,
@@ -650,12 +714,12 @@ fun UnwatchedEpisodesBottomSheet(
 
                                 Button(
                                     onClick = { onWatchEpisode(ep.id) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                                    colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                                     modifier = Modifier.height(28.dp),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("✓ Watched", color = BgBase, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("✓ Watched", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

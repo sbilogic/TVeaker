@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -15,9 +16,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,7 +52,12 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Tracked Shows", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text("Tracked Shows", fontWeight = FontWeight.Black, fontSize = 20.sp, color = TextPrimary)
+                        Text("${filteredShows.size} shows cataloged", fontSize = 11.sp, color = TextMuted)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BgBase,
                     titleContentColor = TextPrimary
@@ -65,51 +72,57 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            // Search Bar
+            // Stripe Search Bar with Glowing Focus Outline
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search shows by title...", color = TextMuted, fontSize = 13.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = TextMuted) },
+                placeholder = { Text("Search catalog by title...", color = TextMuted, fontSize = 13.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = StripeCyan) },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
-                    focusedBorderColor = AccentCyan,
+                    focusedBorderColor = StripeCyan,
                     unfocusedBorderColor = BorderSubtle,
-                    focusedContainerColor = BgSurface,
+                    focusedContainerColor = BgSurfaceElevated,
                     unfocusedContainerColor = BgSurface
                 )
             )
 
-            // Status filter chips
+            // Stripe Status Filter Segmented Pills
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(bottom = 12.dp)
             ) {
                 items(statuses) { (statusValue, label) ->
                     val isSelected = state.selectedStatus == statusValue
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.setStatusFilter(statusValue) },
-                        label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = BgSurface,
-                            labelColor = TextSecondary,
-                            selectedContainerColor = AccentCyan,
-                            selectedLabelColor = BgBase
+                    Surface(
+                        color = if (isSelected) StripeIris else BgSurface,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isSelected) StripeCyan.copy(alpha = 0.5f) else BorderSubtle
+                        ),
+                        modifier = Modifier.clickable { viewModel.setStatusFilter(statusValue) }
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            color = if (isSelected) TextPrimary else TextSecondary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                         )
-                    )
+                    }
                 }
             }
 
             if (state.isLoading && state.shows.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AccentCyan)
+                    CircularProgressIndicator(color = StripeIris)
                 }
             } else if (state.errorMessage != null && state.shows.isEmpty()) {
                 Box(
@@ -139,11 +152,11 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
 
                             Button(
                                 onClick = { viewModel.setServerUrl("http://192.168.1.33:8000/") },
-                                colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                                colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("📱 Wi-Fi LAN (192.168.1.33:8000)", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("📱 Wi-Fi LAN (192.168.1.33:8000)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -161,14 +174,14 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                             TextButton(
                                 onClick = { viewModel.loadShows() }
                             ) {
-                                Text("🔄 Retry Connection", color = AccentPurple, fontWeight = FontWeight.Bold)
+                                Text("🔄 Retry Connection", color = StripeCyan, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             } else if (filteredShows.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No shows found.", color = TextSecondary)
+                    Text("No matching shows found.", color = TextSecondary)
                 }
             } else {
                 LazyColumn(
@@ -176,7 +189,7 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(filteredShows) { show ->
-                        ShowDetailCard(
+                        StripeShowDetailCard(
                             show = show,
                             onStatusChange = { newStatus -> viewModel.updateShowStatus(show.showId, newStatus) },
                             onOpenEpisodes = { viewModel.loadUnwatchedEpisodes(show.showId) },
@@ -189,12 +202,13 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
         }
 
         // Unwatched Episodes Bottom Sheet
-        if (state.selectedShowUnwatched != null) {
+        val unwatchedData = state.selectedShowUnwatched
+        if (unwatchedData != null) {
             UnwatchedEpisodesBottomSheet(
-                data = state.selectedShowUnwatched!!,
+                data = unwatchedData,
                 onDismiss = { viewModel.dismissEpisodesSheet() },
                 onWatchEpisode = { epId ->
-                    viewModel.markEpisodeWatched(state.selectedShowUnwatched!!.showId, epId)
+                    viewModel.markEpisodeWatched(unwatchedData.showId, epId)
                 }
             )
         }
@@ -202,7 +216,7 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
 }
 
 @Composable
-fun ShowDetailCard(
+fun StripeShowDetailCard(
     show: ShowEstimateDto,
     onStatusChange: (String) -> Unit,
     onOpenEpisodes: () -> Unit,
@@ -210,12 +224,12 @@ fun ShowDetailCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onOpenEpisodes() },
-        colors = CardDefaults.cardColors(containerColor = BgSurface),
-        shape = RoundedCornerShape(16.dp),
+        color = BgSurface,
+        shape = RoundedCornerShape(18.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -227,7 +241,7 @@ fun ShowDetailCard(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     if (!show.posterUrl.isNullOrEmpty()) {
                         AsyncImage(
@@ -238,23 +252,23 @@ fun ShowDetailCard(
                             contentDescription = show.title,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(width = 44.dp, height = 66.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                                .size(width = 46.dp, height = 68.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(width = 44.dp, height = 66.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(AccentCyan.copy(alpha = 0.12f))
-                                .border(1.dp, AccentCyan.copy(alpha = 0.25f), RoundedCornerShape(8.dp)),
+                                .size(width = 46.dp, height = 68.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(StripeIris.copy(alpha = 0.15f))
+                                .border(1.dp, StripeIris.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = show.title.take(1),
-                                fontWeight = FontWeight.ExtraBold,
-                                color = AccentCyan,
+                                fontWeight = FontWeight.Black,
+                                color = StripeCyan,
                                 fontSize = 18.sp
                             )
                         }
@@ -275,20 +289,40 @@ fun ShowDetailCard(
                     }
                 }
 
+                // Status Tag Pill with Colored Indicator Dot
                 Box {
-                    Button(
-                        onClick = { expanded = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp),
-                        shape = RoundedCornerShape(8.dp)
+                    val statusDotColor = when (show.status) {
+                        "watching" -> StripeEmerald
+                        "planned" -> StripeCyan
+                        "paused" -> StripeAmber
+                        "completed" -> StripeViolet
+                        else -> TextMuted
+                    }
+
+                    Surface(
+                        color = BgSurfaceElevated,
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                        modifier = Modifier.clickable { expanded = true }
                     ) {
-                        Text(
-                            text = show.status.replaceFirstChar { it.uppercase() },
-                            color = if (show.status == "watching") AccentCyan else TextPrimary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(statusDotColor)
+                            )
+                            Text(
+                                text = show.status.replaceFirstChar { it.uppercase() },
+                                color = TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     DropdownMenu(
@@ -321,9 +355,9 @@ fun ShowDetailCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(show.completionPercent / 100f)
+                        .fillMaxWidth((show.completionPercent / 100f).coerceIn(0.01f, 1f))
                         .fillMaxHeight()
-                        .background(Brush.horizontalGradient(listOf(AccentCyan, AccentIndigo)))
+                        .background(StripeGradientBrush)
                 )
             }
 
@@ -335,15 +369,16 @@ fun ShowDetailCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (show.remainingEpisodes > 0) "${show.remainingEpisodes} episodes left (${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"})" else "✓ Caught up",
-                    color = AccentCyan,
+                    text = if (show.remainingEpisodes > 0) "${show.remainingEpisodes} episodes left (${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"})" else "✓ Complete",
+                    color = StripeCyan,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "${show.completionPercent}% Complete",
+                    text = "${show.completionPercent.toInt()}% Done",
                     color = TextMuted,
-                    fontSize = 10.sp
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace
                 )
             }
 
@@ -356,8 +391,9 @@ fun ShowDetailCard(
             ) {
                 Text(
                     text = if (show.estimatedFinishDate != null) "Target: ${show.estimatedFinishDate.substring(0, minOf(10, show.estimatedFinishDate.length))}" else if (show.isCaughtUp) "✓ Caught up" else "In Progress",
-                    color = if (show.isCaughtUp) Success else TextSecondary,
+                    color = if (show.isCaughtUp) StripeEmerald else TextSecondary,
                     fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.SemiBold
                 )
 
@@ -365,12 +401,12 @@ fun ShowDetailCard(
                     if (show.remainingEpisodes > 0) {
                         Button(
                             onClick = onQuickScrobble,
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                            colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                             modifier = Modifier.height(28.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("+1 Ep", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text("+1 Ep", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                     Button(
@@ -378,7 +414,8 @@ fun ShowDetailCard(
                         colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                         modifier = Modifier.height(28.dp),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
                     ) {
                         Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp)
                     }

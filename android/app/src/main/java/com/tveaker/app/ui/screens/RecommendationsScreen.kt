@@ -2,21 +2,24 @@ package com.tveaker.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,7 +45,23 @@ fun RecommendationsScreen(viewModel: RecommendationsViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("What to Watch", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(StripeGradientBrush),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        }
+                        Column {
+                            Text("What to Watch", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextPrimary)
+                            Text("Deterministic Taste Recommender", fontSize = 10.sp, color = TextMuted)
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BgBase,
                     titleContentColor = TextPrimary
@@ -57,35 +76,41 @@ fun RecommendationsScreen(viewModel: RecommendationsViewModel) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            // Time Budget Chips
-            Text("Time Budget", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            // Time Budget Segmented Filter Bar
+            Text("TIME BUDGET", color = StripeCyan, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, modifier = Modifier.padding(top = 8.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(vertical = 8.dp)
             ) {
                 items(budgets) { (label, budgetVal) ->
                     val isSelected = state.selectedBudget == budgetVal
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { viewModel.setBudget(budgetVal) },
-                        label = { Text(label, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = BgSurface,
-                            labelColor = TextSecondary,
-                            selectedContainerColor = AccentCyan,
-                            selectedLabelColor = BgBase
+                    Surface(
+                        color = if (isSelected) StripeIris else BgSurface,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isSelected) StripeCyan.copy(alpha = 0.5f) else BorderSubtle
+                        ),
+                        modifier = Modifier.clickable { viewModel.setBudget(budgetVal) }
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                            color = if (isSelected) TextPrimary else TextSecondary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                         )
-                    )
+                    }
                 }
             }
 
             if (state.isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AccentCyan)
+                    CircularProgressIndicator(color = StripeIris)
                 }
             } else if (state.items.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No recommendations match this filter.", color = TextSecondary)
+                    Text("No recommendations match this filter criteria.", color = TextSecondary)
                 }
             } else {
                 LazyColumn(
@@ -93,7 +118,7 @@ fun RecommendationsScreen(viewModel: RecommendationsViewModel) {
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(state.items) { item ->
-                        RecommendationDetailCard(
+                        StripeRecommendationDetailCard(
                             item = item,
                             onAction = { action -> viewModel.submitFeedback(item.candidateId, action) }
                         )
@@ -106,14 +131,14 @@ fun RecommendationsScreen(viewModel: RecommendationsViewModel) {
 }
 
 @Composable
-fun RecommendationDetailCard(
+fun StripeRecommendationDetailCard(
     item: RecommendationItemDto,
     onAction: (String) -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = BgSurface),
-        shape = RoundedCornerShape(16.dp),
+        color = BgSurface,
+        shape = RoundedCornerShape(20.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -122,7 +147,7 @@ fun RecommendationDetailCard(
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // High-res Poster artwork
+                // High-res Poster Artwork
                 if (!item.posterUrl.isNullOrEmpty()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
@@ -132,24 +157,24 @@ fun RecommendationDetailCard(
                         contentDescription = item.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(width = 52.dp, height = 78.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                            .size(width = 54.dp, height = 80.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
                     )
                 } else {
                     Box(
                         modifier = Modifier
-                            .size(width = 52.dp, height = 78.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(AccentCyan.copy(alpha = 0.12f))
-                            .border(1.dp, AccentCyan.copy(alpha = 0.25f), RoundedCornerShape(8.dp)),
+                            .size(width = 54.dp, height = 80.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(StripeIris.copy(alpha = 0.15f))
+                            .border(1.dp, StripeIris.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = item.title.take(1),
-                            fontWeight = FontWeight.ExtraBold,
-                            color = AccentCyan,
-                            fontSize = 18.sp
+                            fontWeight = FontWeight.Black,
+                            color = StripeCyan,
+                            fontSize = 20.sp
                         )
                     }
                 }
@@ -162,7 +187,7 @@ fun RecommendationDetailCard(
                     ) {
                         Text(
                             text = item.title,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Black,
                             fontSize = 16.sp,
                             color = TextPrimary,
                             modifier = Modifier.weight(1f),
@@ -181,15 +206,17 @@ fun RecommendationDetailCard(
                         modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Surface(
-                            color = AccentPurple.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(6.dp)
+                            color = StripeViolet.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, StripeViolet.copy(alpha = 0.4f))
                         ) {
                             Text(
-                                text = "${(item.score * 100).toInt()}% Match",
-                                color = AccentPurple,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                text = "${(item.score * 100).toInt()}% MATCH",
+                                color = StripeCyan,
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                             )
                         }
 
@@ -207,47 +234,55 @@ fun RecommendationDetailCard(
                     text = item.overview,
                     color = TextSecondary,
                     fontSize = 12.sp,
-                    lineHeight = 16.sp,
+                    lineHeight = 17.sp,
                     maxLines = 3,
                     modifier = Modifier.padding(top = 12.dp)
                 )
             }
 
-            // Explanation box
+            // Stripe Inset Explanation Callout
             Surface(
-                color = BgPrimary.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(8.dp),
+                color = BgPrimary.copy(alpha = 0.8f),
+                shape = RoundedCornerShape(10.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
             ) {
-                Text(
-                    text = "💡 ${item.explanation}",
-                    color = TextSecondary,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    modifier = Modifier.padding(8.dp)
-                )
+                Row(modifier = Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "💡",
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        text = item.explanation,
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = { onAction("accepted") },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
-                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
+                    shape = RoundedCornerShape(10.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .height(36.dp)
+                        .height(38.dp)
                 ) {
-                    Text("Watch Now", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextPrimary)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Watch Now", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
                 OutlinedButton(
                     onClick = { onAction("not_now") },
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                    modifier = Modifier.height(36.dp)
+                    modifier = Modifier.height(38.dp)
                 ) {
                     Text("Later", color = TextSecondary, fontSize = 12.sp)
                 }

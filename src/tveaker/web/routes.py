@@ -749,12 +749,12 @@ def api_get_app_version() -> dict[str, Any]:
     size_bytes = apk_path.stat().st_size if apk_path.exists() else None
 
     return {
-        "version_code": 5,
-        "version_name": "1.3.0",
+        "version_code": 6,
+        "version_name": "1.4.0",
         "apk_url": "/api/v1/app/download-apk",
         "changelog": (
-            "Premium Apple Pro design system overhaul: gorgeous layout, "
-            "obsidian colors, bento tiles, spotlight billboard, and artwork updates."
+            "Stripe Design System Overhaul: Signature Iris & Cyan luminous gradients, "
+            "hairline specular borders, tactile floating glass dock, and Aurora Spotlight cards."
         ),
         "release_date": "2026-08-29",
         "apk_size_bytes": size_bytes,
@@ -774,5 +774,5 @@ def api_download_apk() -> Any:
     return FileResponse(
         path=str(apk_path),
         media_type="application/vnd.android.package-archive",
-        filename="tveaker-v1.3.0.apk",
+        filename="tveaker-v1.4.0.apk",
     )
