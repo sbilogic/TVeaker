@@ -1,5 +1,6 @@
 package com.tveaker.app.ui.update
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -11,7 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
@@ -30,12 +30,17 @@ class UpdateManager(private val context: Context) {
             val responseBody = apiService.downloadApk()
             val totalBytes = responseBody.contentLength()
 
-            val apkDir = File(context.cacheDir, "updates").apply { mkdirs() }
+            val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
+            val apkDir = File(baseDir, "updates").apply { mkdirs() }
             val destinationFile = File(apkDir, "tveaker-update.apk")
+
+            if (destinationFile.exists()) {
+                destinationFile.delete()
+            }
 
             responseBody.byteStream().use { inputStream ->
                 FileOutputStream(destinationFile).use { outputStream ->
-                    val buffer = ByteArray(8192)
+                    val buffer = ByteArray(16384)
                     var bytesRead: Int
                     var totalDownloaded = 0L
 
@@ -49,6 +54,9 @@ class UpdateManager(private val context: Context) {
                 }
             }
 
+            // Ensure destination file is readable by the PackageInstaller process
+            destinationFile.setReadable(true, false)
+
             emit(UpdateDownloadState.ReadyToInstall(destinationFile))
         } catch (e: Exception) {
             emit(UpdateDownloadState.Error(e.localizedMessage ?: "Failed to download update."))
@@ -61,15 +69,22 @@ class UpdateManager(private val context: Context) {
                 throw IllegalStateException("APK file not found at ${apkFile.absolutePath}")
             }
 
-            // Check Unknown Sources on Android 8.0+
+            // Check Unknown Sources permission on Android 8.0+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (!context.packageManager.canRequestPackageInstalls()) {
-                    val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    try {
+                        val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(settingsIntent)
+                    } catch (e: ActivityNotFoundException) {
+                        val fallbackIntent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(fallbackIntent)
                     }
-                    context.startActivity(settingsIntent)
-                    throw IllegalStateException("Please enable 'Install unknown apps' for TVeaker in Settings, then tap install again.")
+                    throw IllegalStateException("Please enable 'Install unknown apps' permission for TVeaker in Android Settings, then tap Install again.")
                 }
             }
 

@@ -24,7 +24,8 @@ data class SettingsUiState(
     val errorMessage: String? = null,
     // OTA Update state
     val isCheckingUpdate: Boolean = false,
-    val availableUpdate: AppVersionDto? = null,
+    val serverVersionInfo: AppVersionDto? = null,
+    val isNewUpdateAvailable: Boolean = false,
     val updateMessage: String? = null,
     val downloadProgress: Float? = null,
     val readyToInstallApk: File? = null,
@@ -45,8 +46,10 @@ class SettingsViewModel(
     }
 
     fun setBaseUrl(newUrl: String) {
-        repository.updateBaseUrl(newUrl)
-        _uiState.value = _uiState.value.copy(baseUrl = newUrl)
+        val trimmed = newUrl.trim()
+        val formatted = if (trimmed.endsWith("/")) trimmed else "$trimmed/"
+        repository.updateBaseUrl(formatted)
+        _uiState.value = _uiState.value.copy(baseUrl = formatted)
         checkHealth()
         checkForUpdates()
     }
@@ -75,23 +78,28 @@ class SettingsViewModel(
             val result = repository.getAppVersion()
             if (result.isSuccess) {
                 val versionInfo = result.getOrNull()
-                if (versionInfo != null && versionInfo.versionCode > BuildConfig.VERSION_CODE) {
+                if (versionInfo != null) {
+                    val isNewer = versionInfo.versionCode > BuildConfig.VERSION_CODE
                     _uiState.value = _uiState.value.copy(
                         isCheckingUpdate = false,
-                        availableUpdate = versionInfo,
-                        updateMessage = "New update available: v${versionInfo.versionName} (Build ${versionInfo.versionCode})"
+                        serverVersionInfo = versionInfo,
+                        isNewUpdateAvailable = isNewer,
+                        updateMessage = if (isNewer) {
+                            "New Version: v${versionInfo.versionName} (Build ${versionInfo.versionCode})"
+                        } else {
+                            "Server has build v${versionInfo.versionName} (Build ${versionInfo.versionCode})"
+                        }
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isCheckingUpdate = false,
-                        availableUpdate = null,
-                        updateMessage = "You're on the latest version (v${BuildConfig.VERSION_NAME})"
+                        updateMessage = "Invalid update response from server."
                     )
                 }
             } else {
                 _uiState.value = _uiState.value.copy(
                     isCheckingUpdate = false,
-                    updateMessage = "Could not check for updates"
+                    updateMessage = "Could not check updates: ${result.exceptionOrNull()?.message ?: "Network error"}"
                 )
             }
         }
@@ -99,6 +107,7 @@ class SettingsViewModel(
 
     fun startDownloadUpdate(context: Context) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(downloadProgress = 0.01f, errorMessage = null)
             val updateManager = UpdateManager(context)
             updateManager.downloadApk(repository.getApiService()).collect { state ->
                 when (state) {
@@ -109,7 +118,7 @@ class SettingsViewModel(
                         _uiState.value = _uiState.value.copy(
                             downloadProgress = null,
                             readyToInstallApk = state.apkFile,
-                            updateMessage = "Download complete. Tap Install Update."
+                            updateMessage = "Download complete. Tap Install."
                         )
                         installUpdate(context, state.apkFile)
                     }
@@ -131,7 +140,7 @@ class SettingsViewModel(
         val result = updateManager.installApk(fileToInstall)
         if (result.isFailure) {
             _uiState.value = _uiState.value.copy(
-                errorMessage = result.exceptionOrNull()?.message ?: "Failed to open installer."
+                errorMessage = result.exceptionOrNull()?.message ?: "Failed to trigger installer."
             )
         }
     }
