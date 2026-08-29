@@ -71,6 +71,8 @@ class MediaItem(Base):
     runtime_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str | None] = mapped_column(String, nullable=True)
     genres_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    poster_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    backdrop_url: Mapped[str | None] = mapped_column(String, nullable=True)
     first_aired: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     remote_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

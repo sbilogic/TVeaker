@@ -31,44 +31,49 @@
 
 <!-- Apple TV+ Hero Spotlight Billboard -->
 <div class="hero-spotlight">
-  <div style="max-width: 650px; position: relative; z-index: 2;">
-    <div class="hero-badge-tag">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-      Spotlight • Primary In-Progress
-    </div>
-    <h2 class="hero-title">{{ top_show.title }}</h2>
-    <div class="hero-meta">
-      <span>{{ top_show.year or '' }}</span>
-      <span>•</span>
-      <span>{{ top_show.watched_episodes }}/{{ top_show.total_episodes }} episodes</span>
-      <span>•</span>
-      <span class="badge badge-accent">{{ top_show.avg_runtime_minutes }}m avg/ep</span>
-      {% if top_show.genres %}
-        <span class="badge badge-secondary">{{ top_show.genres[0] }}</span>
-      {% endif %}
-    </div>
+  <div style="display: flex; gap: 28px; align-items: center; max-width: 700px; position: relative; z-index: 2;">
+    {% if top_show.poster_url %}
+      <img src="{{ top_show.poster_url }}" alt="{{ top_show.title }}" style="width: 105px; height: 155px; border-radius: var(--radius-md); object-fit: cover; box-shadow: 0 12px 30px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.15); flex-shrink: 0; cursor: pointer;" onclick="openEpisodesDrawer({{ top_show.show_id }}, '{{ top_show.title | replace("'", "\\'") }}')" />
+    {% endif %}
+    <div>
+      <div class="hero-badge-tag">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        Spotlight • Primary In-Progress
+      </div>
+      <h2 class="hero-title" style="cursor: pointer;" onclick="openEpisodesDrawer({{ top_show.show_id }}, '{{ top_show.title | replace("'", "\\'") }}')">{{ top_show.title }}</h2>
+      <div class="hero-meta">
+        <span>{{ top_show.year or '' }}</span>
+        <span>•</span>
+        <span>{{ top_show.watched_episodes }}/{{ top_show.total_episodes }} episodes</span>
+        <span>•</span>
+        <span class="badge badge-accent">{{ top_show.avg_runtime_minutes }}m avg/ep</span>
+        {% if top_show.genres %}
+          <span class="badge badge-secondary">{{ top_show.genres[0] }}</span>
+        {% endif %}
+      </div>
 
-    <div style="font-size: 0.95rem; color: #cbd5e1; margin-bottom: 24px; line-height: 1.5;">
-      {% if top_show.remaining_episodes > 0 %}
-        You have <strong style="color: var(--accent-cyan);">{{ top_show.remaining_episodes }} episodes left</strong> ({{ top_show.remaining_runtime_display }}). At your velocity of <strong>{{ top_show.episodes_per_week }} eps/wk</strong>, you are projected to finish by <strong style="color: #fff;">{{ top_show.estimated_finish_date.strftime('%B %d, %Y') if top_show.estimated_finish_date else 'Soon' }}</strong>.
-      {% else %}
-        <strong style="color: var(--success);">✓ You are completely caught up with all aired episodes!</strong>
-      {% endif %}
-    </div>
+      <div style="font-size: 0.95rem; color: #cbd5e1; margin-bottom: 20px; line-height: 1.5;">
+        {% if top_show.remaining_episodes > 0 %}
+          You have <strong style="color: var(--accent-cyan);">{{ top_show.remaining_episodes }} episodes left</strong> ({{ top_show.remaining_runtime_display }}). Projected finish: <strong style="color: #fff;">{{ top_show.estimated_finish_date.strftime('%B %d, %Y') if top_show.estimated_finish_date else 'Soon' }}</strong>.
+        {% else %}
+          <strong style="color: var(--success);">✓ You are completely caught up with all aired episodes!</strong>
+        {% endif %}
+      </div>
 
-    <div class="hero-actions">
-      {% if top_show.remaining_episodes > 0 %}
-        <button class="btn btn-primary" onclick="quickScrobble({{ top_show.show_id }}, '{{ top_show.title | replace("'", "\\'") }}')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          Mark +1 Episode Watched
+      <div class="hero-actions">
+        {% if top_show.remaining_episodes > 0 %}
+          <button class="btn btn-primary" onclick="quickScrobble({{ top_show.show_id }}, '{{ top_show.title | replace("'", "\\'") }}')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Mark +1 Ep Watched
+          </button>
+          <button class="btn btn-secondary" onclick="openEpisodesDrawer({{ top_show.show_id }}, '{{ top_show.title | replace("'", "\\'") }}')">
+            📋 Remaining Episodes
+          </button>
+        {% endif %}
+        <button class="btn btn-secondary" onclick="openPaceModal({{ top_show.show_id }}, '{{ top_show.title | replace("'", "\\'") }}', {{ top_show.episodes_per_week }}, {{ top_show.remaining_episodes }})">
+          ✏️ Velocity
         </button>
-      {% endif %}
-      <button class="btn btn-secondary" onclick="openPaceModal({{ top_show.show_id }}, '{{ top_show.title | replace("'", "\\'") }}', {{ top_show.episodes_per_week }}, {{ top_show.remaining_episodes }})">
-        ✏️ Velocity Calculator
-      </button>
-      <a href="https://trakt.tv/shows/{{ top_show.trakt_id }}" target="_blank" class="btn btn-secondary" style="font-size: 0.82rem; padding: 10px 14px;">
-        Trakt ↗
-      </a>
+      </div>
     </div>
   </div>
 
@@ -154,12 +159,16 @@
   {% for est in estimates %}
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
-      <div style="display: flex; gap: 12px; align-items: center;">
-        <div style="width: 44px; height: 44px; border-radius: var(--radius-md); background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; color: var(--accent-cyan); flex-shrink: 0; box-shadow: var(--shadow-glow-cyan);">
-          {{ est.title[:1] }}
-        </div>
+      <div style="display: flex; gap: 14px; align-items: center;">
+        {% if est.poster_url %}
+          <img src="{{ est.poster_url }}" alt="{{ est.title }}" style="width: 48px; height: 72px; border-radius: var(--radius-sm); object-fit: cover; box-shadow: 0 6px 16px rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; cursor: pointer;" onclick="openEpisodesDrawer({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}')" />
+        {% else %}
+          <div style="width: 48px; height: 72px; border-radius: var(--radius-sm); background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.3rem; color: var(--accent-cyan); flex-shrink: 0; box-shadow: var(--shadow-glow-cyan); cursor: pointer;" onclick="openEpisodesDrawer({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}')">
+            {{ est.title[:1] }}
+          </div>
+        {% endif %}
         <div>
-          <h3 class="card-title">{{ est.title }}</h3>
+          <h3 class="card-title" style="cursor: pointer;" onclick="openEpisodesDrawer({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}')">{{ est.title }}</h3>
           <div class="card-meta">
             <span>{{ est.year or '' }}</span>
             <span>•</span>
@@ -184,7 +193,7 @@
       <span>{{ est.completion_percent }}% completed</span>
       <span>
         {% if est.remaining_episodes > 0 %}
-          <span class="progress-runtime-badge">
+          <span class="progress-runtime-badge" style="cursor: pointer;" onclick="openEpisodesDrawer({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}')">
             {{ est.remaining_episodes }} left ({{ est.remaining_runtime_display }})
           </span>
         {% else %}
@@ -214,7 +223,10 @@
       <div style="display: flex; gap: 8px;">
         {% if est.remaining_episodes > 0 %}
           <button class="btn btn-sm btn-primary" style="flex: 1; font-weight: 800; font-size: 0.8rem;" onclick="quickScrobble({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}')">
-            +1 Ep Watched
+            +1 Ep
+          </button>
+          <button class="btn btn-sm btn-secondary" style="font-size: 0.8rem;" onclick="openEpisodesDrawer({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}')">
+            📋 Episodes
           </button>
         {% endif %}
         <button class="btn btn-sm btn-secondary" style="font-size: 0.8rem;" onclick="openPaceModal({{ est.show_id }}, '{{ est.title | replace("'", "\\'") }}', {{ est.episodes_per_week }}, {{ est.remaining_episodes }})">

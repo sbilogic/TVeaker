@@ -27,6 +27,22 @@ interface TVeakerApiService {
         @Body request: UpdateShowRequest
     ): ShowEstimateDto
 
+    @GET("api/v1/shows/{show_id}/unwatched")
+    suspend fun getUnwatchedEpisodes(
+        @Path("show_id") showId: Int
+    ): UnwatchedEpisodesResponseDto
+
+    @POST("api/v1/shows/{show_id}/quick-scrobble")
+    suspend fun quickScrobble(
+        @Path("show_id") showId: Int
+    ): Map<String, Any>
+
+    @POST("api/v1/shows/{show_id}/episodes/{episode_id}/watch")
+    suspend fun watchEpisode(
+        @Path("show_id") showId: Int,
+        @Path("episode_id") episodeId: Int
+    ): Map<String, Any>
+
     @GET("api/v1/recommendations")
     suspend fun getRecommendations(
         @Query("time_budget_minutes") timeBudgetMinutes: Int? = null,

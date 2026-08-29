@@ -1,5 +1,5 @@
 /**
- * TVeaker Ultra-Polished Interactive Client
+ * TVeaker Ultra-Polished Interactive Client • Apple Pro Design
  */
 
 // Toast notification helper
@@ -102,6 +102,119 @@ async function quickScrobble(showId, showTitle) {
   }
 }
 
+// Mark specific episode watched
+async function watchSpecificEpisode(showId, episodeId, epTitle) {
+  try {
+    const res = await fetch(`/api/v1/shows/${showId}/episodes/${episodeId}/watch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (res.ok) {
+      showToast(`✓ Watched: ${epTitle}`, 'success', 2000);
+      const row = document.getElementById(`ep-row-${episodeId}`);
+      if (row) {
+        row.style.opacity = '0.3';
+        row.style.textDecoration = 'line-through';
+        row.querySelector('button')?.remove();
+      }
+    } else {
+      const err = await res.json();
+      showToast(err.detail || 'Failed to mark episode', 'error');
+    }
+  } catch (e) {
+    showToast(`Error: ${e.message}`, 'error');
+  }
+}
+
+// Apple Spatial Slide-over Drawer for Unwatched Episodes
+async function openEpisodesDrawer(showId, showTitle) {
+  let drawer = document.getElementById('episodes-drawer-container');
+  if (drawer) drawer.remove();
+
+  drawer = document.createElement('div');
+  drawer.id = 'episodes-drawer-container';
+  drawer.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(16px);
+    display: flex; justify-content: flex-end; z-index: 10000;
+  `;
+
+  drawer.innerHTML = `
+    <div style="background: rgba(14, 18, 30, 0.96); border-left: 1px solid rgba(255, 255, 255, 0.12); width: 100%; max-width: 520px; height: 100vh; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,0.8);">
+      <div style="padding: 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">${showTitle}</h2>
+          <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 700; margin-top: 2px;">REMAINING UNWATCHED EPISODES</div>
+        </div>
+        <button onclick="document.getElementById('episodes-drawer-container').remove()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 1rem;">✕</button>
+      </div>
+
+      <div id="drawer-episodes-list" style="flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="text-align: center; padding: 40px; color: #94a3b8;">
+          <div class="pulse-dot" style="margin: 0 auto 12px auto;"></div>
+          Loading remaining episodes...
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(drawer);
+
+  // Fetch unwatched list
+  try {
+    const res = await fetch(`/api/v1/shows/${showId}/unwatched`);
+    const data = await res.json();
+    const listEl = document.getElementById('drawer-episodes-list');
+
+    if (!data.unwatched_episodes || data.unwatched_episodes.length === 0) {
+      listEl.innerHTML = `
+        <div style="text-align: center; padding: 60px 20px; color: #10b981;">
+          <div style="font-size: 2.5rem; margin-bottom: 12px;">🎉</div>
+          <h3 style="font-size: 1.2rem; font-weight: 800; color: #fff;">Completely Caught Up!</h3>
+          <p style="font-size: 0.88rem; color: #94a3b8; margin-top: 6px;">You have watched all available episodes of this series.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = `
+      <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 12px; padding: 14px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #cbd5e1;">
+          <span><strong>${data.remaining_episodes}</strong> episodes remaining</span>
+          <span style="color: #38bdf8; font-weight: 700; font-family: monospace;">~${Math.round(data.unwatched_minutes / 60 * 10) / 10}h total</span>
+        </div>
+      </div>
+    `;
+
+    data.unwatched_episodes.forEach((ep) => {
+      const epCode = `S${String(ep.season_number).padStart(2, '0')}E${String(ep.episode_number).padStart(2, '0')}`;
+      const epTitleSafe = (ep.title || 'Episode ' + ep.episode_number).replace("'", "\\'");
+      html += `
+        <div id="ep-row-${ep.id}" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+          <div style="flex-grow: 1;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <span style="font-family: monospace; font-weight: 800; color: #38bdf8; font-size: 0.84rem; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px;">${epCode}</span>
+              <strong style="color: #fff; font-size: 0.92rem;">${ep.title || 'Untitled'}</strong>
+            </div>
+            <div style="font-size: 0.76rem; color: #94a3b8;">
+              ${ep.runtime_minutes}m ${ep.first_aired ? '• ' + ep.first_aired.substring(0, 10) : ''}
+            </div>
+          </div>
+          <button class="btn btn-sm btn-primary" style="font-size: 0.76rem; padding: 6px 12px; font-weight: 800;" onclick="watchSpecificEpisode(${showId}, ${ep.id}, '${epTitleSafe}')">
+            ✓ Watched
+          </button>
+        </div>
+      `;
+    });
+
+    listEl.innerHTML = html;
+  } catch (e) {
+    const listEl = document.getElementById('drawer-episodes-list');
+    if (listEl) {
+      listEl.innerHTML = `<div style="color: #f43f5e; padding: 20px;">Failed to load episodes: ${e.message}</div>`;
+    }
+  }
+}
+
 // Live show status update
 async function updateShowStatus(showId, status) {
   try {
@@ -143,12 +256,12 @@ function openPaceModal(showId, showTitle, currentPace, remainingEps) {
   modal = document.createElement('div');
   modal.id = 'pace-modal';
   modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(12px);
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(16px);
     display: flex; align-items: center; justify-content: center; z-index: 10000;
   `;
 
   modal.innerHTML = `
-    <div style="background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0 20px 50px rgba(0,0,0,0.7); border-radius: 20px; padding: 28px; width: 90%; max-width: 440px; color: #fff;">
+    <div style="background: rgba(14, 18, 30, 0.96); border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.8); border-radius: 20px; padding: 28px; width: 90%; max-width: 440px; color: #fff;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h3 style="font-size: 1.2rem; font-weight: 800;">Target Velocity Calculator</h3>
         <button onclick="document.getElementById('pace-modal').remove()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
@@ -175,7 +288,7 @@ function openPaceModal(showId, showTitle, currentPace, remainingEps) {
 
       <div style="display: flex; gap: 10px;">
         <button id="pace-reset-btn" class="btn btn-secondary" style="flex: 1;">Reset to Auto</button>
-        <button id="pace-save-btn" class="btn btn-primary" style="flex: 1; font-weight: 700;">Save Velocity</button>
+        <button id="pace-save-btn" class="btn btn-primary" style="flex: 1; font-weight: 800;">Save Velocity</button>
       </div>
     </div>
   `;
@@ -298,9 +411,12 @@ function setupInstantSearch(inputId, targetSelector) {
   });
 }
 
-// Keyboard shortcuts: '/' focuses search, 'Esc' closes modals
+// Keyboard shortcuts: '/' or '⌘K' focuses search, 'Esc' closes modals & drawers
 document.addEventListener('keydown', (e) => {
-  if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+  if (
+    (e.key === '/' || (e.metaKey && e.key === 'k') || (e.ctrlKey && e.key === 'k')) &&
+    document.activeElement.tagName !== 'INPUT'
+  ) {
     e.preventDefault();
     const searchInput =
       document.getElementById('shows-search-input') ||
@@ -309,6 +425,8 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'Escape') {
     const modal = document.getElementById('pace-modal');
     if (modal) modal.remove();
+    const drawer = document.getElementById('episodes-drawer-container');
+    if (drawer) drawer.remove();
   }
 });
 

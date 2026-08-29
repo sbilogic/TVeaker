@@ -6,7 +6,7 @@
 <div class="header-bar">
   <div>
     <h1 class="page-title">Tracked Shows</h1>
-    <p class="page-subtitle">Manage viewing velocity, custom paces, status categories, and remaining watch runtimes</p>
+    <p class="page-subtitle">Manage viewing velocity, custom paces, status categories, and exact unwatched episode breakdown</p>
   </div>
   <div>
     <button id="sync-trigger-btn" class="btn btn-secondary" onclick="triggerSync('incremental')">
@@ -17,7 +17,7 @@
 </div>
 
 <!-- Search & Filter Controls -->
-<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px;">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px;">
   <div class="filters-bar" style="margin-bottom: 0;">
     <a href="/shows" class="filter-btn {% if not current_status %}active{% endif %}">All Shows ({{ shows | length }})</a>
     <a href="/shows?status=watching" class="filter-btn {% if current_status == 'watching' %}active{% endif %}">Watching</a>
@@ -27,7 +27,7 @@
     <a href="/shows?status=dropped" class="filter-btn {% if current_status == 'dropped' %}active{% endif %}">Dropped</a>
   </div>
 
-  <div class="search-container" style="margin-bottom: 0; min-width: 280px;">
+  <div class="search-container" style="margin-bottom: 0; min-width: 300px;">
     <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="11" cy="11" r="8"></circle>
       <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -36,12 +36,12 @@
   </div>
 </div>
 
-<!-- Modern Glass Data Table -->
+<!-- Apple Pro Glass Data Table -->
 <div class="table-container">
   <table>
     <thead>
       <tr>
-        <th>Show & Details</th>
+        <th>Show & Artwork</th>
         <th>Completion Progress</th>
         <th>Remaining Time</th>
         <th>Status</th>
@@ -55,12 +55,16 @@
       {% for show in shows %}
       <tr>
         <td>
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <div style="width: 38px; height: 38px; border-radius: var(--radius-sm); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--accent-cyan); font-size: 1rem; flex-shrink: 0;">
-              {{ show.title[:1] }}
-            </div>
+          <div style="display: flex; gap: 14px; align-items: center;">
+            {% if show.poster_url %}
+              <img src="{{ show.poster_url }}" alt="{{ show.title }}" style="width: 38px; height: 56px; border-radius: var(--radius-xs); object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; cursor: pointer;" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')" />
+            {% else %}
+              <div style="width: 38px; height: 56px; border-radius: var(--radius-xs); background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); display: flex; align-items: center; justify-content: center; font-weight: 800; color: var(--accent-cyan); font-size: 1.1rem; flex-shrink: 0; cursor: pointer;" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
+                {{ show.title[:1] }}
+              </div>
+            {% endif %}
             <div>
-              <div style="font-weight: 700; color: var(--text-primary);">{{ show.title }}</div>
+              <div style="font-weight: 700; color: #fff; cursor: pointer;" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">{{ show.title }}</div>
               <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
                 {{ show.year or '' }} • {{ show.avg_runtime_minutes }}m avg/ep
               </div>
@@ -70,7 +74,7 @@
         <td style="min-width: 150px;">
           <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 4px;">
             <span style="color: var(--text-secondary);">{{ show.watched_episodes }}/{{ show.total_episodes }} eps</span>
-            <span style="font-weight: 700; color: var(--text-primary);">{{ show.completion_percent }}%</span>
+            <span style="font-weight: 700; color: #fff;">{{ show.completion_percent }}%</span>
           </div>
           <div class="progress-bar-container" style="margin: 0; height: 5px;">
             <div class="progress-bar-fill" style="width: {{ show.completion_percent }}%;"></div>
@@ -78,18 +82,18 @@
         </td>
         <td>
           {% if show.remaining_episodes > 0 %}
-            <div class="progress-runtime-badge" style="display: inline-block;">
+            <div class="progress-runtime-badge" style="display: inline-block; cursor: pointer;" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
               {{ show.remaining_runtime_display }}
             </div>
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">
-              {{ show.remaining_episodes }} eps left
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; cursor: pointer;" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
+              {{ show.remaining_episodes }} eps left 📋
             </div>
           {% else %}
-            <span style="color: var(--success); font-size: 0.82rem; font-weight: 600;">✓ Caught up</span>
+            <span style="color: var(--success); font-size: 0.82rem; font-weight: 700;">✓ Caught up</span>
           {% endif %}
         </td>
         <td>
-          <select style="background: rgba(15, 23, 42, 0.8); color: var(--text-primary); border: 1px solid var(--border-medium); padding: 5px 10px; border-radius: var(--radius-sm); font-size: 0.82rem; font-family: var(--font-sans); cursor: pointer;" onchange="updateShowStatus({{ show.show_id }}, this.value)">
+          <select style="background: rgba(15, 23, 42, 0.8); color: #fff; border: 1px solid var(--border-medium); padding: 5px 10px; border-radius: var(--radius-sm); font-size: 0.82rem; font-family: var(--font-sans); cursor: pointer;" onchange="updateShowStatus({{ show.show_id }}, this.value)">
             <option value="watching" {% if show.status == 'watching' %}selected{% endif %}>Watching</option>
             <option value="planned" {% if show.status == 'planned' %}selected{% endif %}>Planned</option>
             <option value="paused" {% if show.status == 'paused' %}selected{% endif %}>Paused</option>
@@ -102,14 +106,14 @@
             <div style="color: var(--accent-cyan); font-weight: 700; font-size: 0.88rem;">{{ show.estimated_finish_date.strftime('%b %d, %Y') }}</div>
             <div style="font-size: 0.74rem; color: var(--text-muted);">~{{ show.days_to_finish }} days</div>
           {% elif show.is_caught_up %}
-            <span style="color: var(--success); font-size: 0.82rem; font-weight: 600;">✓ Up to date</span>
+            <span style="color: var(--success); font-size: 0.82rem; font-weight: 700;">✓ Up to date</span>
           {% else %}
             <span style="color: var(--text-muted); font-size: 0.82rem;">—</span>
           {% endif %}
         </td>
         <td>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.85rem;">{{ show.episodes_per_week }}</span>
+            <span style="font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem; color: #fff;">{{ show.episodes_per_week }}</span>
             <button class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 0.75rem;" onclick="openPaceModal({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}', {{ show.episodes_per_week }}, {{ show.remaining_episodes }})">
               ✏️ Adjust
             </button>
@@ -123,8 +127,11 @@
         <td>
           <div style="display: flex; gap: 6px; align-items: center;">
             {% if show.remaining_episodes > 0 %}
-              <button class="btn btn-sm btn-primary" style="font-size: 0.75rem; padding: 3px 8px; font-weight: 700;" onclick="quickScrobble({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
+              <button class="btn btn-sm btn-primary" style="font-size: 0.75rem; padding: 3px 8px; font-weight: 800;" onclick="quickScrobble({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
                 +1 Ep
+              </button>
+              <button class="btn btn-sm btn-secondary" style="font-size: 0.75rem; padding: 3px 8px;" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
+                📋
               </button>
             {% endif %}
             <a href="https://trakt.tv/shows/{{ show.trakt_id }}" target="_blank" class="btn btn-sm btn-secondary" style="font-size: 0.75rem; padding: 3px 8px;">

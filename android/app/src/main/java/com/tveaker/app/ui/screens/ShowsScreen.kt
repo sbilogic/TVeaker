@@ -2,6 +2,7 @@ package com.tveaker.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -15,9 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.tveaker.app.data.model.ShowEstimateDto
 import com.tveaker.app.ui.theme.*
 import com.tveaker.app.ui.viewmodel.ShowsViewModel
@@ -124,12 +129,24 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
                         ShowDetailCard(
                             show = show,
                             onStatusChange = { newStatus -> viewModel.updateShowStatus(show.showId, newStatus) },
-                            onToggleSpecials = { viewModel.toggleSpecials(show.showId, false) }
+                            onOpenEpisodes = { viewModel.loadUnwatchedEpisodes(show.showId) },
+                            onQuickScrobble = { viewModel.quickScrobble(show.showId) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(24.dp)) }
                 }
             }
+        }
+
+        // Unwatched Episodes Bottom Sheet
+        if (state.selectedShowUnwatched != null) {
+            UnwatchedEpisodesBottomSheet(
+                data = state.selectedShowUnwatched!!,
+                onDismiss = { viewModel.dismissEpisodesSheet() },
+                onWatchEpisode = { epId ->
+                    viewModel.markEpisodeWatched(state.selectedShowUnwatched!!.showId, epId)
+                }
+            )
         }
     }
 }
@@ -138,17 +155,20 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
 fun ShowDetailCard(
     show: ShowEstimateDto,
     onStatusChange: (String) -> Unit,
-    onToggleSpecials: () -> Unit
+    onOpenEpisodes: () -> Unit,
+    onQuickScrobble: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenEpisodes() },
         colors = CardDefaults.cardColors(containerColor = BgSurface),
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -159,20 +179,35 @@ fun ShowDetailCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(AccentCyan.copy(alpha = 0.12f))
-                            .border(1.dp, AccentCyan.copy(alpha = 0.25f), RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = show.title.take(1),
-                            fontWeight = FontWeight.ExtraBold,
-                            color = AccentCyan,
-                            fontSize = 15.sp
+                    if (!show.posterUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(show.posterUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = show.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(width = 40.dp, height = 60.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
                         )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 40.dp, height = 60.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(AccentCyan.copy(alpha = 0.12f))
+                                .border(1.dp, AccentCyan.copy(alpha = 0.25f), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = show.title.take(1),
+                                fontWeight = FontWeight.ExtraBold,
+                                color = AccentCyan,
+                                fontSize = 16.sp
+                            )
+                        }
                     }
 
                     Column {
@@ -272,7 +307,8 @@ fun ShowDetailCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = if (show.estimatedFinishDate != null) "Target: ${show.estimatedFinishDate.substring(0, minOf(10, show.estimatedFinishDate.length))}" else if (show.isCaughtUp) "✓ Caught up" else "Status: ${show.status}",
@@ -280,12 +316,26 @@ fun ShowDetailCard(
                     fontSize = 11.sp,
                     fontWeight = if (show.isCaughtUp) FontWeight.Medium else FontWeight.Normal
                 )
-                if (show.daysToFinish != null && show.daysToFinish > 0) {
-                    Text(
-                        text = "~${show.daysToFinish} days left",
-                        color = TextMuted,
-                        fontSize = 11.sp
-                    )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (show.remainingEpisodes > 0) {
+                        Button(
+                            onClick = onQuickScrobble,
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentCyan),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("+1 Ep", color = BgBase, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+                    Button(
+                        onClick = onOpenEpisodes,
+                        colors = ButtonDefaults.buttonColors(containerColor = BgSurfaceElevated),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text("Episodes 📋", color = TextPrimary, fontSize = 11.sp)
+                    }
                 }
             }
         }

@@ -40,6 +40,8 @@ class ShowEstimate:
     is_caught_up: bool
     next_air_date: datetime | None
     genres: list[str] = field(default_factory=list)
+    poster_url: str | None = None
+    backdrop_url: str | None = None
 
 
 class FinishEstimator(Protocol):
@@ -140,6 +142,8 @@ class ShowFinishEstimator:
                 is_caught_up=is_caught_up,
                 next_air_date=counts.next_air_date,
                 genres=media.genres,
+                poster_url=media.poster_url,
+                backdrop_url=media.backdrop_url,
             )
 
     def estimate_all(self, status: str | None = None) -> list[ShowEstimate]:

@@ -27,6 +27,18 @@ class TVeakerRepository(
         runCatching { apiService.updateShow(showId, request) }
     }
 
+    suspend fun getUnwatchedEpisodes(showId: Int): Result<UnwatchedEpisodesResponseDto> = withContext(Dispatchers.IO) {
+        runCatching { apiService.getUnwatchedEpisodes(showId) }
+    }
+
+    suspend fun quickScrobble(showId: Int): Result<Map<String, Any>> = withContext(Dispatchers.IO) {
+        runCatching { apiService.quickScrobble(showId) }
+    }
+
+    suspend fun watchEpisode(showId: Int, episodeId: Int): Result<Map<String, Any>> = withContext(Dispatchers.IO) {
+        runCatching { apiService.watchEpisode(showId, episodeId) }
+    }
+
     suspend fun getRecommendations(
         timeBudgetMinutes: Int? = null,
         intent: String = "auto",

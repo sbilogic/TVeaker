@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tveaker.app.data.model.RecommendationItemDto
 import com.tveaker.app.data.model.ShowEstimateDto
+import com.tveaker.app.data.model.UnwatchedEpisodesResponseDto
 import com.tveaker.app.data.repository.TVeakerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,9 @@ data class DashboardUiState(
     val recommendations: List<RecommendationItemDto> = emptyList(),
     val runId: Int? = null,
     val errorMessage: String? = null,
-    val isSyncing: Boolean = false
+    val isSyncing: Boolean = false,
+    val selectedShowUnwatched: UnwatchedEpisodesResponseDto? = null,
+    val isEpisodesLoading: Boolean = false
 )
 
 class DashboardViewModel(
@@ -56,6 +59,43 @@ class DashboardViewModel(
         }
     }
 
+    fun loadUnwatchedEpisodes(showId: Int) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isEpisodesLoading = true)
+            val result = repository.getUnwatchedEpisodes(showId)
+            if (result.isSuccess) {
+                _uiState.value = _uiState.value.copy(
+                    isEpisodesLoading = false,
+                    selectedShowUnwatched = result.getOrNull()
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isEpisodesLoading = false,
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to load episodes"
+                )
+            }
+        }
+    }
+
+    fun dismissEpisodesSheet() {
+        _uiState.value = _uiState.value.copy(selectedShowUnwatched = null)
+    }
+
+    fun markEpisodeWatched(showId: Int, episodeId: Int) {
+        viewModelScope.launch {
+            repository.watchEpisode(showId, episodeId)
+            loadUnwatchedEpisodes(showId)
+            loadDashboardData()
+        }
+    }
+
+    fun quickScrobble(showId: Int) {
+        viewModelScope.launch {
+            repository.quickScrobble(showId)
+            loadDashboardData()
+        }
+    }
+
     fun triggerSync(mode: String = "incremental") {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSyncing = true)
@@ -65,8 +105,7 @@ class DashboardViewModel(
         }
     }
 
-    fun submitFeedback(candidateId: String, action: String) {
-        val runId = _uiState.value.runId ?: return
+    fun submitFeedback(runId: Int, candidateId: String, action: String) {
         viewModelScope.launch {
             repository.submitFeedback(runId, candidateId, action)
             _uiState.value = _uiState.value.copy(

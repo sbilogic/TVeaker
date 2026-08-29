@@ -534,6 +534,108 @@ def api_quick_scrobble(request: Request, show_id: int) -> dict[str, Any]:
     }
 
 
+@api_router.get("/shows/{show_id}/unwatched")
+def api_get_unwatched_episodes(request: Request, show_id: int) -> dict[str, Any]:
+    """Get the exact list of remaining unwatched episodes for a show."""
+    db_engine: Engine = request.app.state.db_engine
+    with get_db_session(db_engine) as session:
+        media = session.get(MediaItem, show_id)
+        if media is None:
+            raise HTTPException(status_code=404, detail=f"Show {show_id} not found.")
+
+        # Get watched episode IDs
+        watched_ep_ids = set(
+            session.execute(
+                select(WatchEvent.episode_id)
+                .join(Episode, WatchEvent.episode_id == Episode.id)
+                .where(
+                    WatchEvent.account_id == 1,
+                    Episode.show_id == show_id,
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        all_eps = (
+            session.execute(
+                select(Episode)
+                .where(
+                    Episode.show_id == show_id,
+                    Episode.season_number > 0,
+                )
+                .order_by(Episode.season_number.asc(), Episode.episode_number.asc())
+            )
+            .scalars()
+            .all()
+        )
+
+        unwatched = [
+            {
+                "id": ep.id,
+                "season_number": ep.season_number,
+                "episode_number": ep.episode_number,
+                "title": ep.title,
+                "overview": ep.overview,
+                "runtime_minutes": ep.runtime_minutes or media.runtime_minutes or 42,
+                "first_aired": ep.first_aired.isoformat() if ep.first_aired else None,
+            }
+            for ep in all_eps
+            if ep.id not in watched_ep_ids
+        ]
+
+        total_unwatched_mins = sum(
+            int(ep["runtime_minutes"])
+            for ep in unwatched
+            if isinstance(ep["runtime_minutes"], (int, float))
+        )
+
+        return {
+            "show_id": show_id,
+            "title": media.title,
+            "year": media.year,
+            "poster_url": media.poster_url,
+            "backdrop_url": media.backdrop_url,
+            "genres": media.genres,
+            "total_episodes": len(all_eps),
+            "watched_episodes": len(all_eps) - len(unwatched),
+            "remaining_episodes": len(unwatched),
+            "unwatched_minutes": total_unwatched_mins,
+            "unwatched_episodes": unwatched,
+        }
+
+
+@api_router.post("/shows/{show_id}/episodes/{episode_id}/watch")
+def api_watch_episode(request: Request, show_id: int, episode_id: int) -> dict[str, Any]:
+    """Mark a specific episode of a show as watched locally."""
+    db_engine: Engine = request.app.state.db_engine
+    clock: Clock = request.app.state.clock
+    now = clock.now()
+
+    with get_db_session(db_engine) as session:
+        ep = session.get(Episode, episode_id)
+        if ep is None or ep.show_id != show_id:
+            raise HTTPException(status_code=404, detail="Episode not found for this show.")
+
+        event = WatchEvent(
+            account_id=1,
+            episode_id=ep.id,
+            action="watch",
+            watched_at=now,
+        )
+        session.add(event)
+        session.flush()
+
+    estimator = ShowFinishEstimator(db_engine=db_engine, clock=clock)
+    updated_est = estimator.estimate_show(show_id)
+
+    return {
+        "success": True,
+        "watched_episode_id": episode_id,
+        "updated_estimate": asdict(updated_est) if updated_est else None,
+    }
+
+
 @api_router.get("/recommendations")
 def api_get_recommendations(
     request: Request,
@@ -647,12 +749,12 @@ def api_get_app_version() -> dict[str, Any]:
     size_bytes = apk_path.stat().st_size if apk_path.exists() else None
 
     return {
-        "version_code": 2,
-        "version_name": "1.1.0",
+        "version_code": 3,
+        "version_name": "1.2.0",
         "apk_url": "/api/v1/app/download-apk",
         "changelog": (
-            "Accurate average runtime estimation, remaining runtime badges, "
-            "and in-app OTA update installer."
+            "Poster artwork support, exact unwatched episodes breakdown sheet, "
+            "and TVDB/TVMaze image integration."
         ),
         "release_date": "2026-08-29",
         "apk_size_bytes": size_bytes,
@@ -672,5 +774,5 @@ def api_download_apk() -> Any:
     return FileResponse(
         path=str(apk_path),
         media_type="application/vnd.android.package-archive",
-        filename="tveaker-v1.1.0.apk",
+        filename="tveaker-v1.2.0.apk",
     )

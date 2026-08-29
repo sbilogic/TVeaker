@@ -3,6 +3,7 @@ package com.tveaker.app.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tveaker.app.data.model.ShowEstimateDto
+import com.tveaker.app.data.model.UnwatchedEpisodesResponseDto
 import com.tveaker.app.data.model.UpdateShowRequest
 import com.tveaker.app.data.repository.TVeakerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +15,9 @@ data class ShowsUiState(
     val isLoading: Boolean = false,
     val shows: List<ShowEstimateDto> = emptyList(),
     val selectedStatus: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val selectedShowUnwatched: UnwatchedEpisodesResponseDto? = null,
+    val isEpisodesLoading: Boolean = false
 )
 
 class ShowsViewModel(
@@ -48,6 +51,43 @@ class ShowsViewModel(
                     errorMessage = result.exceptionOrNull()?.message ?: "Failed to load shows"
                 )
             }
+        }
+    }
+
+    fun loadUnwatchedEpisodes(showId: Int) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isEpisodesLoading = true)
+            val result = repository.getUnwatchedEpisodes(showId)
+            if (result.isSuccess) {
+                _uiState.value = _uiState.value.copy(
+                    isEpisodesLoading = false,
+                    selectedShowUnwatched = result.getOrNull()
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isEpisodesLoading = false,
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to load episodes"
+                )
+            }
+        }
+    }
+
+    fun dismissEpisodesSheet() {
+        _uiState.value = _uiState.value.copy(selectedShowUnwatched = null)
+    }
+
+    fun markEpisodeWatched(showId: Int, episodeId: Int) {
+        viewModelScope.launch {
+            repository.watchEpisode(showId, episodeId)
+            loadUnwatchedEpisodes(showId)
+            loadShows()
+        }
+    }
+
+    fun quickScrobble(showId: Int) {
+        viewModelScope.launch {
+            repository.quickScrobble(showId)
+            loadShows()
         }
     }
 

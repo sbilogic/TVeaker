@@ -81,9 +81,20 @@ def get_db_session(engine: Engine | None = None) -> Generator[Session, None, Non
 
 
 def init_db(engine: Engine | None = None) -> None:
-    """Initialize database tables using metadata."""
+    """Initialize database tables using metadata and apply schema updates."""
     target_engine = engine or get_engine()
     Base.metadata.create_all(bind=target_engine)
+    with target_engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN poster_url VARCHAR;"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN backdrop_url VARCHAR;"))
+            conn.commit()
+        except Exception:
+            pass
 
 
 def check_db_health(session: Session) -> bool:

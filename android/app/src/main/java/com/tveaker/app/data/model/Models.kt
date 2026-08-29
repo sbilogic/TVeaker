@@ -34,7 +34,36 @@ data class ShowEstimateDto(
     @Json(name = "estimated_finish_date") val estimatedFinishDate: String?,
     @Json(name = "days_to_finish") val daysToFinish: Int?,
     @Json(name = "is_caught_up") val isCaughtUp: Boolean,
-    @Json(name = "next_air_date") val nextAirDate: String?
+    @Json(name = "next_air_date") val nextAirDate: String?,
+    @Json(name = "poster_url") val posterUrl: String? = null,
+    @Json(name = "backdrop_url") val backdropUrl: String? = null,
+    val genres: List<String> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class UnwatchedEpisodeDto(
+    val id: Int,
+    @Json(name = "season_number") val seasonNumber: Int,
+    @Json(name = "episode_number") val episodeNumber: Int,
+    val title: String?,
+    val overview: String?,
+    @Json(name = "runtime_minutes") val runtimeMinutes: Int?,
+    @Json(name = "first_aired") val firstAired: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class UnwatchedEpisodesResponseDto(
+    @Json(name = "show_id") val showId: Int,
+    val title: String,
+    val year: Int?,
+    @Json(name = "poster_url") val posterUrl: String?,
+    @Json(name = "backdrop_url") val backdropUrl: String?,
+    val genres: List<String> = emptyList(),
+    @Json(name = "total_episodes") val totalEpisodes: Int,
+    @Json(name = "watched_episodes") val watchedEpisodes: Int,
+    @Json(name = "remaining_episodes") val remainingEpisodes: Int,
+    @Json(name = "unwatched_minutes") val unwatchedMinutes: Int,
+    @Json(name = "unwatched_episodes") val unwatchedEpisodes: List<UnwatchedEpisodeDto> = emptyList()
 )
 
 @JsonClass(generateAdapter = true)
@@ -102,12 +131,7 @@ data class SyncTriggerRequest(
 
 @JsonClass(generateAdapter = true)
 data class SyncReportDto(
-    @Json(name = "run_id") val runId: Int,
-    val mode: String,
     val status: String,
-    val fetched: Map<String, Int>,
-    val inserted: Map<String, Int>,
-    val updated: Map<String, Int>,
-    val deleted: Map<String, Int>,
-    val warnings: List<String>
+    val fetched: Map<String, Int>? = null,
+    val duration_ms: Float? = null
 )
