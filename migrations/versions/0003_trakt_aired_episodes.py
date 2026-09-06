@@ -17,8 +17,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("media_items") as batch_op:
-        batch_op.add_column(sa.Column("trakt_aired_episodes", sa.Integer(), nullable=True))
+    bind = op.get_bind()
+    insp = sa.inspect(bind)
+    cols = [c["name"] for c in insp.get_columns("media_items")]
+    if "trakt_aired_episodes" not in cols:
+        with op.batch_alter_table("media_items") as batch_op:
+            batch_op.add_column(sa.Column("trakt_aired_episodes", sa.Integer(), nullable=True))
 
 
 def downgrade() -> None:
