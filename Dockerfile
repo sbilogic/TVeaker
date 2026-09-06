@@ -20,6 +20,7 @@ COPY src/ ./src/
 COPY migrations/ ./migrations/
 COPY alembic.ini ./
 COPY docker-entrypoint.sh ./
+COPY data/seed.db.gz ./data/seed.db.gz
 
 # Install the application package in editable mode
 RUN uv pip install --no-deps -e .

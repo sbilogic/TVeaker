@@ -1,9 +1,18 @@
 #!/bin/sh
 set -e
 
-# Ensure database directory exists
-DB_DIR=$(dirname "${TVEAKER_DATABASE_PATH:-data/tveaker.db}")
+TARGET_DB="${TVEAKER_DATABASE_PATH:-data/tveaker.db}"
+DB_DIR=$(dirname "$TARGET_DB")
 mkdir -p "$DB_DIR"
+
+# Seed database if not present or empty
+if [ ! -s "$TARGET_DB" ]; then
+    if [ -f "data/seed.db.gz" ]; then
+        echo "Initializing database from seed.db.gz..."
+        python -c "import gzip, shutil; shutil.copyfileobj(gzip.open('data/seed.db.gz', 'rb'), open('$TARGET_DB', 'wb'))"
+        echo "Database seeded successfully."
+    fi
+fi
 
 # Run database migrations
 echo "Running database migrations..."
