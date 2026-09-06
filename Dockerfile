@@ -1,10 +1,10 @@
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ENV PYTHONUNBUFFERED=1 \
-    UV_SYSTEM_PYTHON=1 \
     TVEAKER_ENV=production \
     TVEAKER_HOST=0.0.0.0 \
-    PORT=8000
+    PORT=8000 \
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
