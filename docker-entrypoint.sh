@@ -7,7 +7,7 @@ mkdir -p "$DB_DIR"
 
 # Run database migrations
 echo "Running database migrations..."
-alembic upgrade head
+python -m alembic upgrade head
 
 # Start TVeaker server
 echo "Starting TVeaker on port ${PORT:-8000}..."
