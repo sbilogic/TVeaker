@@ -2,3 +2,4 @@
 *.sh text eol=lf
 *.py text
 *.db.gz binary
+*.apk binary

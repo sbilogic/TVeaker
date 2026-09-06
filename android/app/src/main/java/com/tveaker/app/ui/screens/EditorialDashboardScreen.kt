@@ -425,16 +425,30 @@ private fun EditorialHero(show: ShowEstimateDto, onOpenEpisodes: () -> Unit, onM
                     maxLines = 1,
                     modifier = Modifier.padding(top = 3.dp)
                 )
-                Spacer(Modifier.weight(1f))
                 Row(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(onClick = onOpenEpisodes).padding(vertical = if (compact) 6.dp else 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth().padding(top = if (compact) 6.dp else 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("RESUME", color = colors.onBackground, fontSize = if (compact) 15.sp else 16.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                    Icon(Icons.Default.ArrowForward, null, tint = colors.primary, modifier = Modifier.size(20.dp))
+                    Button(
+                        onClick = onOpenEpisodes,
+                        modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                        shape = RectangleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.onBackground, contentColor = colors.background),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("RESUME", fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
+                    }
+                    OutlinedButton(
+                        onClick = onOpenEpisodes,
+                        modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                        shape = RectangleShape,
+                        contentPadding = PaddingValues(horizontal = 6.dp)
+                    ) {
+                        Text("CHOOSE", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                    }
                 }
-                Divider(color = colors.onBackground)
             }
         }
     }
@@ -544,7 +558,16 @@ private fun EditorialQueueRow(show: ShowEstimateDto, onClick: () -> Unit) {
             Text(show.title, color = colors.onBackground, fontFamily = FontFamily.Serif, fontSize = if (compact) 17.sp else 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("${show.remainingEpisodes} left · ${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"}", color = colors.onSurfaceVariant, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
         }
-        Icon(Icons.Default.ArrowForward, null, tint = colors.outline, modifier = Modifier.size(18.dp))
+        OutlinedButton(
+            onClick = onClick,
+            shape = RectangleShape,
+            modifier = Modifier.height(34.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+        ) {
+            Icon(Icons.Default.PlayArrow, null, tint = colors.primary, modifier = Modifier.size(13.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("WATCH", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.onBackground)
+        }
     }
     Divider(color = colors.outlineVariant)
 }
@@ -607,11 +630,19 @@ private fun EditorialEpisodesSheet(
                             Text(episode.title ?: "Untitled episode", color = colors.onSurface, fontFamily = FontFamily.Serif, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             episode.runtimeMinutes?.let { Text("$it min", color = colors.outline, fontSize = 10.sp) }
                         }
-                        Row {
-                            IconButton(onClick = { onSelectNowWatching(episode.id) }) {
-                                Icon(Icons.Default.PlayArrow, "Watch now", tint = colors.primary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedButton(
+                                onClick = { onSelectNowWatching(episode.id) },
+                                shape = RectangleShape,
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, null, tint = colors.primary, modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text("SET HERO", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
                             }
-                            IconButton(onClick = { onWatchEpisode(episode.id) }) {
+                            Spacer(Modifier.width(4.dp))
+                            IconButton(onClick = { onWatchEpisode(episode.id) }, modifier = Modifier.size(32.dp)) {
                                 Icon(Icons.Default.CheckCircle, "Mark watched", tint = colors.onSurfaceVariant)
                             }
                         }
