@@ -1,128 +1,51 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="system" data-density="comfortable">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Dashboard{% endblock %} • TVeaker Pro</title>
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}Home{% endblock %} · TVeaker</title>
+  <script>
+    (() => {
+      const saved = localStorage.getItem('tveaker-theme');
+      const theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.dataset.theme = theme;
+      const density = localStorage.getItem('tveaker-density');
+      document.documentElement.dataset.density = density === 'compact' ? 'compact' : 'comfortable';
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800;900&family=Instrument+Serif:ital@0;1&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300,0,0&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css?v=20260830-compact2">
   <script src="/static/app.js" defer></script>
 </head>
 <body>
-  <!-- SVG Gradient Definitions for Rings and Meters -->
-  <svg width="0" height="0" style="position: absolute;">
-    <defs>
-      <linearGradient id="hero-ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="#38bdf8" />
-        <stop offset="50%" stop-color="#6366f1" />
-        <stop offset="100%" stop-color="#a855f7" />
-      </linearGradient>
-    </defs>
-  </svg>
-
-  <aside class="sidebar">
-    <a href="/" class="logo-container">
-      <div class="logo-icon-wrapper">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
-          <path d="M10 7.5v7l6-3.5z"/>
-        </svg>
-      </div>
-      <div>
-        <div class="logo-title">TVeaker</div>
-        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.8px;">PRO EDITION</div>
-      </div>
-      <span class="logo-badge" style="margin-left: auto;">v1.1</span>
-    </a>
-
-    <ul class="nav-links">
-      <li class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
-        <a href="/">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="9"></rect>
-            <rect x="14" y="3" width="7" height="5"></rect>
-            <rect x="14" y="12" width="7" height="9"></rect>
-            <rect x="3" y="16" width="7" height="5"></rect>
-          </svg>
-          <span>Dashboard</span>
-        </a>
-      </li>
-      <li class="nav-item {% if active_page == 'shows' %}active{% endif %}">
-        <a href="/shows">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-            <polyline points="17 2 12 7 7 2"></polyline>
-          </svg>
-          <span>Tracked Shows</span>
-        </a>
-      </li>
-      <li class="nav-item {% if active_page == 'recommendations' %}active{% endif %}">
-        <a href="/recommendations">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-          </svg>
-          <span>Recommendations</span>
-        </a>
-      </li>
-      <li class="nav-item {% if active_page == 'history' %}active{% endif %}">
-        <a href="/history">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          <span>Watch History</span>
-        </a>
-      </li>
-      <li class="nav-item {% if active_page == 'settings' %}active{% endif %}">
-        <a href="/settings">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-          <span>Settings</span>
-        </a>
-      </li>
-    </ul>
-
-    <div class="sidebar-footer">
-      <div class="status-pill">
-        <span class="pulse-dot"></span>
-        <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          {% if account %}
-            <strong style="color: var(--text-primary);">{{ account.username }}</strong>
-          {% else %}
-            <span>Local Database</span>
-          {% endif %}
-        </div>
-      </div>
+  <aside class="editorial-nav" aria-label="Primary navigation">
+    <div class="nav-masthead">
+      <a href="/" class="wordmark">TVeaker</a>
+      <span class="sync-state"><i></i>{% if account %}{{ account.username }}{% else %}LOCAL{% endif %}</span>
+    </div>
+    <nav class="indexed-nav">
+      <a href="/" class="indexed-nav-item {% if active_page == 'dashboard' %}active{% endif %}"><span class="nav-index">01</span><span class="material-symbols-rounded nav-icon">home</span><span>Home</span></a>
+      <a href="/shows" class="indexed-nav-item {% if active_page == 'shows' %}active{% endif %}"><span class="nav-index">02</span><span class="material-symbols-rounded nav-icon">menu_book</span><span>Library</span></a>
+      <a href="/recommendations" class="indexed-nav-item {% if active_page == 'recommendations' %}active{% endif %}"><span class="nav-index">03</span><span class="material-symbols-rounded nav-icon">explore</span><span>Discover</span></a>
+      <a href="/history" class="indexed-nav-item {% if active_page == 'history' %}active{% endif %}"><span class="nav-index">04</span><span class="material-symbols-rounded nav-icon">history</span><span>History</span></a>
+      <a href="/settings" class="indexed-nav-item {% if active_page == 'settings' %}active{% endif %}"><span class="nav-index">05</span><span class="material-symbols-rounded nav-icon">settings</span><span>Settings</span></a>
+    </nav>
+    <div class="nav-footer">
+      <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch color theme">
+        <span class="material-symbols-rounded" data-theme-icon>dark_mode</span><span data-theme-label>Dark</span>
+      </button>
+      <button class="density-toggle" type="button" data-density-toggle aria-label="Switch to compact mode" aria-pressed="false">
+        <span class="material-symbols-rounded" data-density-icon>density_medium</span><span data-density-label>Compact</span>
+      </button>
+      <button class="nav-sync" type="button" onclick="triggerSync('incremental')">
+        <span class="material-symbols-rounded">sync</span><span>Sync</span>
+      </button>
     </div>
   </aside>
-
-  <main class="main-content">
-    {% block content %}{% endblock %}
-  </main>
-
-  <!-- Apple Spatial Floating Command Dock -->
-  <div class="floating-command-dock">
-    <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-secondary);">
-      <span class="pulse-dot"></span>
-      <span style="font-weight: 700; color: #fff;">TVeaker</span>
-    </div>
-    <div class="dock-divider"></div>
-    <a href="/recommendations" class="dock-item">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-      <span>Discover</span>
-    </a>
-    <button onclick="triggerSync('incremental')" class="dock-item" style="background: none; border: none; cursor: pointer; font-family: inherit;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-      <span>Sync</span>
-    </button>
-    <div class="dock-divider"></div>
-    <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); padding: 2px 6px; background: rgba(255,255,255,0.08); border-radius: 4px;">
-      / or ⌘K Search
-    </div>
-  </div>
+  <main class="main-content editorial-page editorial-page--{{ active_page|default('dashboard') }}">{% block content %}{% endblock %}</main>
 </body>
 </html>

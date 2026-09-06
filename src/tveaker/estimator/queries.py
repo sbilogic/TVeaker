@@ -7,6 +7,7 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from tveaker.episode_catalog import get_show_progress_catalog
 from tveaker.models import Episode, MediaItem, TrackedShow, WatchEvent
 
 
@@ -16,6 +17,13 @@ def _ensure_utc(dt: datetime | None) -> datetime | None:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC)
+
+
+def is_episode_released(first_aired: datetime | None, now: datetime) -> bool:
+    """Return whether an episode has a known air date that has passed."""
+    first_aired_utc = _ensure_utc(first_aired)
+    now_utc = _ensure_utc(now) or datetime.now(UTC)
+    return first_aired_utc is not None and first_aired_utc <= now_utc
 
 
 def format_runtime_duration(minutes: int) -> str:
@@ -42,6 +50,7 @@ class ShowCatalogCounts:
     remaining_episodes: int
     unwatched_minutes: int
     unaired_episodes: int
+    unresolved_episodes: int
     next_air_date: datetime | None
     avg_runtime_minutes: int
     remaining_runtime_display: str
@@ -54,15 +63,21 @@ def get_show_episode_counts(
     now: datetime,
     include_specials: bool = False,
 ) -> ShowCatalogCounts:
-    """Compute watched, aired, remaining, and accurate unwatched runtime metrics."""
+    """Compute watched, available, remaining, and unwatched runtime metrics.
+
+    A local/Trakt watch event is authoritative evidence that its episode has
+    aired. Catalog providers can legitimately omit an air date, so metadata
+    gaps must never hide imported watch history from progress.
+    """
     now_utc = _ensure_utc(now) or datetime.now(UTC)
 
-    # Base episode select
-    ep_stmt = select(Episode).where(Episode.show_id == show_id)
-    if not include_specials:
-        ep_stmt = ep_stmt.where(Episode.season_number > 0)
-
-    episodes = session.execute(ep_stmt).scalars().all()
+    catalog = get_show_progress_catalog(
+        session=session,
+        account_id=account_id,
+        show_id=show_id,
+        include_specials=include_specials,
+    )
+    episodes = list(catalog.episodes)
 
     # Get set of watched episode IDs for this account
     watched_ep_ids = set(
@@ -86,12 +101,18 @@ def get_show_episode_counts(
     unaired = 0
     future_air_dates: list[datetime] = []
 
-    # Derive accurate average episode runtime
+    # Runtime estimates must only learn from released episodes. Future catalog
+    # entries can contain placeholders or runtimes that later change.
     show = session.get(MediaItem, show_id)
     known_runtimes = [
         e.runtime_minutes
         for e in episodes
-        if e.runtime_minutes is not None and e.runtime_minutes > 0
+        if (
+            is_episode_released(e.first_aired, now_utc)
+            or e.id in catalog.source_confirmed_episode_ids
+        )
+        and e.runtime_minutes is not None
+        and e.runtime_minutes > 0
     ]
 
     if known_runtimes:
@@ -113,8 +134,6 @@ def get_show_episode_counts(
 
     for ep in episodes:
         is_watched = ep.id in watched_ep_ids
-        if is_watched:
-            watched += 1
 
         ep_runtime = (
             ep.runtime_minutes
@@ -122,19 +141,32 @@ def get_show_episode_counts(
             else avg_runtime
         )
 
-        # Check aired status with timezone normalization
+        # A watch event is stronger evidence than incomplete catalog metadata.
+        # Unwatched episodes with an unknown date remain outside the queue so
+        # we never invite the user to watch an episode whose availability is
+        # genuinely unknown.
         first_aired_utc = _ensure_utc(ep.first_aired)
-        if first_aired_utc is None or first_aired_utc <= now_utc:
+        is_released = (
+            is_episode_released(ep.first_aired, now_utc)
+            or ep.id in catalog.source_confirmed_episode_ids
+        )
+        if is_released or is_watched:
             aired += 1
-            if not is_watched:
+            if is_watched:
+                watched += 1
+            elif is_released:
                 remaining += 1
                 unwatched_mins += ep_runtime
         else:
             unaired += 1
-            future_air_dates.append(first_aired_utc)
-            if not is_watched:
-                remaining += 1
-                unwatched_mins += ep_runtime
+            if first_aired_utc is not None:
+                future_air_dates.append(first_aired_utc)
+
+    if catalog.unresolved_episodes:
+        total += catalog.unresolved_episodes
+        aired += catalog.unresolved_episodes
+        remaining += catalog.unresolved_episodes
+        unwatched_mins += catalog.unresolved_episodes * avg_runtime
 
     next_air = min(future_air_dates) if future_air_dates else None
     runtime_display = format_runtime_duration(unwatched_mins)
@@ -146,6 +178,7 @@ def get_show_episode_counts(
         remaining_episodes=remaining,
         unwatched_minutes=unwatched_mins,
         unaired_episodes=unaired,
+        unresolved_episodes=catalog.unresolved_episodes,
         next_air_date=next_air,
         avg_runtime_minutes=avg_runtime,
         remaining_runtime_display=runtime_display,

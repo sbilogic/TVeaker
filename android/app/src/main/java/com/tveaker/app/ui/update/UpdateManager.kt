@@ -3,6 +3,7 @@ package com.tveaker.app.ui.update
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -56,12 +57,44 @@ class UpdateManager(private val context: Context) {
 
             // Ensure destination file is readable by the PackageInstaller process
             destinationFile.setReadable(true, false)
+            validateDownloadedApk(destinationFile)
 
             emit(UpdateDownloadState.ReadyToInstall(destinationFile))
         } catch (e: Exception) {
             emit(UpdateDownloadState.Error(e.localizedMessage ?: "Failed to download update."))
         }
     }.flowOn(Dispatchers.IO)
+
+    @Suppress("DEPRECATION")
+    private fun validateDownloadedApk(apkFile: File) {
+        val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getPackageArchiveInfo(
+                apkFile.absolutePath,
+                PackageManager.PackageInfoFlags.of(0)
+            )
+        } else {
+            context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+        } ?: throw IllegalStateException("Downloaded update is not a valid APK.")
+
+        if (packageInfo.packageName != context.packageName) {
+            throw IllegalStateException("Downloaded APK belongs to a different application.")
+        }
+
+        val downloadedVersion = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode
+        } else {
+            packageInfo.versionCode.toLong()
+        }
+        val installedInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        val installedVersion = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            installedInfo.longVersionCode
+        } else {
+            installedInfo.versionCode.toLong()
+        }
+        if (downloadedVersion <= installedVersion) {
+            throw IllegalStateException("Downloaded APK is not newer than the installed app.")
+        }
+    }
 
     fun installApk(apkFile: File): Result<Unit> {
         return runCatching {

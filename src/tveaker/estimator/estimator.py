@@ -25,8 +25,11 @@ class ShowEstimate:
     year: int | None
     status: str
     status_source: str
+    include_specials: bool
     total_episodes: int
     aired_episodes: int
+    unaired_episodes: int
+    unresolved_episodes: int
     watched_episodes: int
     remaining_episodes: int
     unwatched_minutes: int
@@ -96,10 +99,10 @@ class ShowFinishEstimator:
                 now=now,
             )
 
-            # Completion percentage (watched vs total non-special episodes)
-            if counts.total_episodes > 0:
+            # Completion is progress through the episodes currently available.
+            if counts.aired_episodes > 0:
                 completion_pct = round(
-                    min(100.0, (counts.watched_episodes / float(counts.total_episodes)) * 100.0),
+                    min(100.0, (counts.watched_episodes / float(counts.aired_episodes)) * 100.0),
                     1,
                 )
             else:
@@ -127,8 +130,11 @@ class ShowFinishEstimator:
                 year=media.year,
                 status=tracked.status,
                 status_source=tracked.status_source,
+                include_specials=tracked.include_specials,
                 total_episodes=counts.total_episodes,
                 aired_episodes=counts.aired_episodes,
+                unaired_episodes=counts.unaired_episodes,
+                unresolved_episodes=counts.unresolved_episodes,
                 watched_episodes=counts.watched_episodes,
                 remaining_episodes=counts.remaining_episodes,
                 unwatched_minutes=counts.unwatched_minutes,

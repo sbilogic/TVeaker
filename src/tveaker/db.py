@@ -95,6 +95,11 @@ def init_db(engine: Engine | None = None) -> None:
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE media_items ADD COLUMN trakt_aired_episodes INTEGER;"))
+            conn.commit()
+        except Exception:
+            pass
 
 
 def check_db_health(session: Session) -> bool:

@@ -117,12 +117,33 @@ async function watchSpecificEpisode(showId, episodeId, epTitle) {
         row.style.textDecoration = 'line-through';
         row.querySelector('button')?.remove();
       }
+      setTimeout(() => window.location.reload(), 700);
     } else {
       const err = await res.json();
       showToast(err.detail || 'Failed to mark episode', 'error');
     }
   } catch (e) {
     showToast(`Error: ${e.message}`, 'error');
+  }
+}
+
+// Choose an exact episode to resume later. This remains local to TVeaker.
+async function selectNowWatching(episodeId, epTitle) {
+  try {
+    const res = await fetch('/api/v1/now-watching', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ episode_id: episodeId }),
+    });
+    if (res.ok) {
+      showToast(`Now watching: ${epTitle}`, 'success', 1800);
+      setTimeout(() => window.location.reload(), 500);
+    } else {
+      const err = await res.json();
+      showToast(err.detail || 'Could not choose this episode', 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
   }
 }
 
@@ -133,24 +154,21 @@ async function openEpisodesDrawer(showId, showTitle) {
 
   drawer = document.createElement('div');
   drawer.id = 'episodes-drawer-container';
-  drawer.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(16px);
-    display: flex; justify-content: flex-end; z-index: 10000;
-  `;
+  drawer.className = 'episodes-drawer';
 
   drawer.innerHTML = `
-    <div style="background: rgba(14, 18, 30, 0.96); border-left: 1px solid rgba(255, 255, 255, 0.12); width: 100%; max-width: 520px; height: 100vh; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(0,0,0,0.8);">
-      <div style="padding: 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center;">
+    <div class="episodes-drawer__panel">
+      <div class="episodes-drawer__header">
         <div>
-          <h2 style="font-size: 1.3rem; font-weight: 800; color: #fff;">${showTitle}</h2>
-          <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 700; margin-top: 2px;">REMAINING UNWATCHED EPISODES</div>
+          <h2>${showTitle}</h2>
+          <div class="episodes-drawer__eyebrow">REMAINING UNWATCHED EPISODES</div>
         </div>
-        <button onclick="document.getElementById('episodes-drawer-container').remove()" style="background: rgba(255,255,255,0.08); border: none; color: #94a3b8; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 1rem;">✕</button>
+        <button class="episodes-drawer__close" aria-label="Close episodes" onclick="document.getElementById('episodes-drawer-container').remove()">✕</button>
       </div>
 
-      <div id="drawer-episodes-list" style="flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
-        <div style="text-align: center; padding: 40px; color: #94a3b8;">
-          <div class="pulse-dot" style="margin: 0 auto 12px auto;"></div>
+      <div id="drawer-episodes-list" class="episodes-drawer__list">
+        <div class="episodes-drawer__loading">
+          <div class="pulse-dot"></div>
           Loading remaining episodes...
         </div>
       </div>
@@ -167,20 +185,20 @@ async function openEpisodesDrawer(showId, showTitle) {
 
     if (!data.unwatched_episodes || data.unwatched_episodes.length === 0) {
       listEl.innerHTML = `
-        <div style="text-align: center; padding: 60px 20px; color: #10b981;">
-          <div style="font-size: 2.5rem; margin-bottom: 12px;">🎉</div>
-          <h3 style="font-size: 1.2rem; font-weight: 800; color: #fff;">Completely Caught Up!</h3>
-          <p style="font-size: 0.88rem; color: #94a3b8; margin-top: 6px;">You have watched all available episodes of this series.</p>
+        <div class="episodes-drawer__empty">
+          <span class="material-symbols-rounded" aria-hidden="true">task_alt</span>
+          <h3>Completely Caught Up!</h3>
+          <p>You have watched all available episodes of this series.</p>
         </div>
       `;
       return;
     }
 
     let html = `
-      <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 12px; padding: 14px; margin-bottom: 8px;">
-        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #cbd5e1;">
+      <div class="episodes-drawer__summary">
+        <div>
           <span><strong>${data.remaining_episodes}</strong> episodes remaining</span>
-          <span style="color: #38bdf8; font-weight: 700; font-family: monospace;">~${Math.round(data.unwatched_minutes / 60 * 10) / 10}h total</span>
+          <span class="episodes-drawer__runtime">~${Math.round(data.unwatched_minutes / 60 * 10) / 10}h total</span>
         </div>
       </div>
     `;
@@ -189,19 +207,24 @@ async function openEpisodesDrawer(showId, showTitle) {
       const epCode = `S${String(ep.season_number).padStart(2, '0')}E${String(ep.episode_number).padStart(2, '0')}`;
       const epTitleSafe = (ep.title || 'Episode ' + ep.episode_number).replace("'", "\\'");
       html += `
-        <div id="ep-row-${ep.id}" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-          <div style="flex-grow: 1;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-              <span style="font-family: monospace; font-weight: 800; color: #38bdf8; font-size: 0.84rem; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 4px;">${epCode}</span>
-              <strong style="color: #fff; font-size: 0.92rem;">${ep.title || 'Untitled'}</strong>
+        <div id="ep-row-${ep.id}" class="episodes-drawer__episode">
+          <div class="episodes-drawer__episode-copy">
+            <div class="episodes-drawer__episode-heading">
+              <span class="episodes-drawer__episode-code">${epCode}</span>
+              <strong>${ep.title || 'Untitled'}</strong>
             </div>
-            <div style="font-size: 0.76rem; color: #94a3b8;">
+            <div class="episodes-drawer__episode-meta">
               ${ep.runtime_minutes}m ${ep.first_aired ? '• ' + ep.first_aired.substring(0, 10) : ''}
             </div>
           </div>
-          <button class="btn btn-sm btn-primary" style="font-size: 0.76rem; padding: 6px 12px; font-weight: 800;" onclick="watchSpecificEpisode(${showId}, ${ep.id}, '${epTitleSafe}')">
-            ✓ Watched
-          </button>
+          <div class="episodes-drawer__actions">
+            <button class="btn btn-sm episodes-drawer__watch episodes-drawer__select" onclick="selectNowWatching(${ep.id}, '${epTitleSafe}')">
+              <span class="material-symbols-rounded" aria-hidden="true">play_arrow</span> Watch now
+            </button>
+            <button class="btn btn-sm btn-primary episodes-drawer__watch" onclick="watchSpecificEpisode(${showId}, ${ep.id}, '${epTitleSafe}')">
+              <span class="material-symbols-rounded" aria-hidden="true">check</span> Watched
+            </button>
+          </div>
         </div>
       `;
     });
@@ -210,7 +233,7 @@ async function openEpisodesDrawer(showId, showTitle) {
   } catch (e) {
     const listEl = document.getElementById('drawer-episodes-list');
     if (listEl) {
-      listEl.innerHTML = `<div style="color: #f43f5e; padding: 20px;">Failed to load episodes: ${e.message}</div>`;
+      listEl.innerHTML = `<div class="episodes-drawer__error">Failed to load episodes: ${e.message}</div>`;
     }
   }
 }
@@ -255,38 +278,35 @@ function openPaceModal(showId, showTitle, currentPace, remainingEps) {
 
   modal = document.createElement('div');
   modal.id = 'pace-modal';
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(16px);
-    display: flex; align-items: center; justify-content: center; z-index: 10000;
-  `;
+  modal.className = 'pace-modal';
 
   modal.innerHTML = `
-    <div style="background: rgba(14, 18, 30, 0.96); border: 1px solid rgba(56, 189, 248, 0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.8); border-radius: 20px; padding: 28px; width: 90%; max-width: 440px; color: #fff;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 style="font-size: 1.2rem; font-weight: 800;">Target Velocity Calculator</h3>
-        <button onclick="document.getElementById('pace-modal').remove()" style="background: none; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer;">✕</button>
+    <div class="pace-modal__dialog">
+      <div class="pace-modal__header">
+        <h3>Target Velocity Calculator</h3>
+        <button class="pace-modal__close" aria-label="Close velocity calculator" onclick="document.getElementById('pace-modal').remove()">✕</button>
       </div>
 
-      <p style="font-size: 0.88rem; color: #94a3b8; margin-bottom: 20px;">
-        Adjust your weekly viewing pace for <strong style="color: #f8fafc;">${showTitle}</strong> (${remEps} eps remaining).
+      <p class="pace-modal__description">
+        Adjust your weekly viewing pace for <strong>${showTitle}</strong> (${remEps} eps remaining).
       </p>
 
-      <div style="margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-size: 0.82rem; color: #94a3b8; font-weight: 600;">EPISODES PER WEEK:</span>
-          <span id="pace-slider-val" style="font-size: 1.2rem; font-weight: 800; color: #38bdf8; font-family: monospace;">${paceVal} eps/wk</span>
+      <div class="pace-modal__control">
+        <div class="pace-modal__control-header">
+          <span>EPISODES PER WEEK:</span>
+          <span id="pace-slider-val">${paceVal} eps/wk</span>
         </div>
-        <input type="range" id="pace-range" min="0.5" max="14" step="0.5" value="${paceVal}" style="width: 100%; accent-color: #38bdf8; cursor: pointer;" />
+        <input type="range" id="pace-range" min="0.5" max="14" step="0.5" value="${paceVal}" />
       </div>
 
-      <div style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; margin-bottom: 24px;">
-        <div style="font-size: 0.78rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Projected Finish Date</div>
-        <div id="pace-projected-finish" style="font-size: 1.1rem; font-weight: 800; color: #38bdf8; margin-top: 4px;">
+      <div class="pace-modal__projection">
+        <div>Projected Finish Date</div>
+        <div id="pace-projected-finish">
           ${calculateFinish(paceVal)}
         </div>
       </div>
 
-      <div style="display: flex; gap: 10px;">
+      <div class="pace-modal__actions">
         <button id="pace-reset-btn" class="btn btn-secondary" style="flex: 1;">Reset to Auto</button>
         <button id="pace-save-btn" class="btn btn-primary" style="flex: 1; font-weight: 800;">Save Velocity</button>
       </div>
@@ -431,6 +451,83 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-  setupInstantSearch('shows-search-input', '.table-container tbody tr');
+  setupInstantSearch('shows-search-input', '.library-entry');
   setupInstantSearch('history-search-input', '.history-row');
+  setupThemeControls();
+  setupDensityControls();
 });
+
+function setupThemeControls() {
+  const root = document.documentElement;
+  const controls = document.querySelectorAll('[data-theme-toggle]');
+
+  const render = () => {
+    const current = root.dataset.theme === 'dark' ? 'dark' : 'light';
+    controls.forEach((control) => {
+      const icon = control.querySelector('[data-theme-icon]');
+      const label = control.querySelector('[data-theme-label]');
+      if (icon) icon.textContent = current === 'dark' ? 'light_mode' : 'dark_mode';
+      if (label) label.textContent = current === 'dark' ? 'Light' : 'Dark';
+      control.setAttribute('aria-label', `Switch to ${current === 'dark' ? 'light' : 'dark'} theme`);
+    });
+  };
+
+  controls.forEach((control) => {
+    control.addEventListener('click', () => {
+      root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('tveaker-theme', root.dataset.theme);
+      render();
+    });
+  });
+
+  render();
+}
+
+function setupDensityControls() {
+  const root = document.documentElement;
+  const controls = document.querySelectorAll('[data-density-toggle]');
+
+  const render = () => {
+    const compact = root.dataset.density === 'compact';
+    controls.forEach((control) => {
+      const icon = control.querySelector('[data-density-icon]');
+      const label = control.querySelector('[data-density-label]');
+      if (icon) icon.textContent = compact ? 'density_small' : 'density_medium';
+      if (label) label.textContent = compact ? 'Roomy' : 'Compact';
+      control.setAttribute('aria-label', compact ? 'Switch to comfortable mode' : 'Switch to compact mode');
+      control.setAttribute('aria-pressed', String(compact));
+    });
+    document.querySelectorAll('[data-density-status]').forEach((status) => {
+      status.textContent = compact ? 'Compact' : 'Comfortable';
+    });
+  };
+
+  controls.forEach((control) => {
+    control.addEventListener('click', () => {
+      root.dataset.density = root.dataset.density === 'compact' ? 'comfortable' : 'compact';
+      localStorage.setItem('tveaker-density', root.dataset.density);
+      render();
+    });
+  });
+
+  render();
+}
+
+async function triggerMetadataHydration(button) {
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.textContent = 'Queued…';
+  try {
+    const response = await fetch('/api/v1/metadata/hydrate', { method: 'POST' });
+    if (!response.ok) throw new Error('Metadata refresh could not be queued.');
+    button.textContent = 'Queued';
+    window.setTimeout(() => {
+      button.innerHTML = original;
+      button.disabled = false;
+    }, 1800);
+  } catch (error) {
+    button.innerHTML = original;
+    button.disabled = false;
+    alert(error.message || 'Metadata refresh could not be queued.');
+  }
+}

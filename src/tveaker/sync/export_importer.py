@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from tveaker.clock import Clock, SystemClock
@@ -93,6 +93,36 @@ def parse_export_datetime(dt_str: str | None) -> datetime | None:
         return None
 
 
+def get_export_tracking_status(
+    session: Session,
+    account_id: int,
+    show_id: int,
+    reported_aired_episodes: int,
+) -> str:
+    """Infer automatic tracking status from Trakt's watched-show snapshot.
+
+    Trakt's ``aired_episodes`` excludes Season 0, matching TVeaker's default
+    explicit-specials setting. Rewatch ``plays`` must not be used: only unique
+    watched standard episodes tell us whether the current catalog is caught up.
+    """
+    if reported_aired_episodes <= 0:
+        return "watching"
+
+    watched_regular_episodes = int(
+        session.execute(
+            select(func.count(func.distinct(WatchEvent.episode_id)))
+            .join(Episode, WatchEvent.episode_id == Episode.id)
+            .where(
+                WatchEvent.account_id == account_id,
+                Episode.show_id == show_id,
+                Episode.season_number > 0,
+                Episode.trakt_id > 0,
+            )
+        ).scalar_one()
+    )
+    return "completed" if watched_regular_episodes >= reported_aired_episodes else "watching"
+
+
 def upsert_export_media(
     session: Session,
     media_type: str,
@@ -104,6 +134,7 @@ def upsert_export_media(
     slug: str | None = None,
     genres: list[str] | None = None,
     runtime_minutes: int | None = None,
+    trakt_aired_episodes: int | None = None,
     overview: str | None = None,
     updated_at: datetime | None = None,
 ) -> int:
@@ -127,6 +158,7 @@ def upsert_export_media(
             slug=slug,
             genres_json=genres_json,
             runtime_minutes=runtime_minutes,
+            trakt_aired_episodes=trakt_aired_episodes,
             overview=overview,
             remote_updated_at=updated_at,
         )
@@ -147,6 +179,8 @@ def upsert_export_media(
             item.genres_json = genres_json
         if runtime_minutes:
             item.runtime_minutes = runtime_minutes
+        if media_type == "show" and trakt_aired_episodes is not None:
+            item.trakt_aired_episodes = trakt_aired_episodes
         if overview:
             item.overview = overview
         if updated_at:
@@ -336,7 +370,8 @@ class TraktExportImporter:
 
                     session.flush()
 
-            # 3. Process watched-shows (Auto-seed TrackedShow & Hydrate Total Aired Episodes)
+            # 3. Process watched-shows and derive the automatic local status
+            # from Trakt's authoritative progress snapshot.
             watched_show_files = [
                 f for f in file_names if f.startswith("watched-shows-") and f.endswith(".json")
             ]
@@ -355,6 +390,7 @@ class TraktExportImporter:
                             continue
 
                         s_trakt_id = s_raw["ids"]["trakt"]
+                        reported_aired_episodes = int(s_raw.get("aired_episodes") or 0)
                         s_id = upsert_export_media(
                             session,
                             media_type="show",
@@ -364,21 +400,33 @@ class TraktExportImporter:
                             imdb_id=s_raw.get("ids", {}).get("imdb"),
                             tmdb_id=s_raw.get("ids", {}).get("tmdb"),
                             slug=s_raw.get("ids", {}).get("slug"),
+                            trakt_aired_episodes=reported_aired_episodes,
                             updated_at=parse_export_datetime(ws_item.get("last_updated_at")) or now,
                         )
 
-                        # Seed tracked show if missing
+                        auto_status = get_export_tracking_status(
+                            session=session,
+                            account_id=1,
+                            show_id=s_id,
+                            reported_aired_episodes=reported_aired_episodes,
+                        )
+
+                        # Preserve user-controlled status, but refresh automatic
+                        # rows as the export's aired snapshot changes.
                         ts = session.get(TrackedShow, (1, s_id))
                         if not ts:
                             ts = TrackedShow(
                                 account_id=1,
                                 show_id=s_id,
-                                status="watching",
+                                status=auto_status,
                                 status_source="auto",
                                 created_at=now,
                                 updated_at=now,
                             )
                             session.add(ts)
+                        elif ts.status_source == "auto" and ts.status != auto_status:
+                            ts.status = auto_status
+                            ts.updated_at = now
                     session.flush()
 
             # 4. Process lists-watchlist.json

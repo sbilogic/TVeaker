@@ -149,7 +149,7 @@ def candidate_env():
         )
         session.add_all([fb_recent, fb_old, fb_perm])
 
-        # Show 1: 4 episodes, 2 watched
+        # Show 1: 4 episodes, 2 watched, 1 not released yet
         for ep_num in range(1, 5):
             ep = Episode(
                 id=500 + ep_num,
@@ -158,6 +158,11 @@ def candidate_env():
                 season_number=1,
                 episode_number=ep_num,
                 title=f"S01E0{ep_num}",
+                first_aired=(
+                    now + timedelta(days=7)
+                    if ep_num == 4
+                    else now - timedelta(days=5 - ep_num)
+                ),
             )
             session.add(ep)
             session.flush()
@@ -251,10 +256,10 @@ def test_candidate_generation_and_exclusions(candidate_env):
     # Movie 8 (not_interested 100 days ago) MUST be permanently excluded
     assert "movie:8" not in candidate_ids
 
-    # Show 1 (Severance, 2 remaining episodes) SHOULD be present
+    # Show 1 has only 1 released, unwatched episode; the future episode is not queued.
     assert "show:5" in candidate_ids
     sev_cand = next(c for c in candidates if c.candidate_id == "show:5")
-    assert sev_cand.remaining_episodes == 2
+    assert sev_cand.remaining_episodes == 1
     assert sev_cand.in_progress is True
 
     # Show 2 (Dropped) MUST be excluded

@@ -7,6 +7,7 @@ import com.tveaker.app.BuildConfig
 import com.tveaker.app.TVeakerApplication
 import com.tveaker.app.data.model.AppVersionDto
 import com.tveaker.app.data.model.HealthDto
+import com.tveaker.app.data.api.GatewayUrl
 import com.tveaker.app.data.repository.TVeakerRepository
 import com.tveaker.app.ui.update.UpdateDownloadState
 import com.tveaker.app.ui.update.UpdateManager
@@ -22,9 +23,11 @@ import java.util.Locale
 data class SettingsUiState(
     val isLoading: Boolean = false,
     val health: HealthDto? = null,
-    val baseUrl: String = "http://192.168.1.33:8000/",
+    val baseUrl: String = GatewayUrl.UNCONFIGURED_BASE_URL,
     val syncMessage: String? = null,
     val isSyncing: Boolean = false,
+    val isHydratingMetadata: Boolean = false,
+    val metadataMessage: String? = null,
     val errorMessage: String? = null,
     // OTA Update state
     val isCheckingUpdate: Boolean = false,
@@ -54,10 +57,14 @@ class SettingsViewModel(
     }
 
     fun setBaseUrl(newUrl: String) {
-        val trimmed = newUrl.trim()
-        val formatted = if (trimmed.endsWith("/")) trimmed else "$trimmed/"
+        val formatted = try {
+            GatewayUrl.normalize(newUrl)
+        } catch (error: IllegalArgumentException) {
+            _uiState.value = _uiState.value.copy(errorMessage = error.message)
+            return
+        }
         repository.updateBaseUrl(formatted)
-        _uiState.value = _uiState.value.copy(baseUrl = formatted)
+        _uiState.value = _uiState.value.copy(baseUrl = formatted, errorMessage = null)
         checkHealth()
         checkForUpdates()
     }
@@ -178,6 +185,28 @@ class SettingsViewModel(
                 _uiState.value = _uiState.value.copy(
                     isSyncing = false,
                     errorMessage = result.exceptionOrNull()?.message ?: "Sync failed"
+                )
+            }
+        }
+    }
+
+    fun hydrateMissingMetadata() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isHydratingMetadata = true,
+                metadataMessage = null,
+                errorMessage = null
+            )
+            val result = repository.hydrateMissingMetadata()
+            _uiState.value = if (result.isSuccess) {
+                _uiState.value.copy(
+                    isHydratingMetadata = false,
+                    metadataMessage = "Metadata refresh queued for ${result.getOrNull()?.limit ?: 75} items."
+                )
+            } else {
+                _uiState.value.copy(
+                    isHydratingMetadata = false,
+                    errorMessage = result.exceptionOrNull()?.message ?: "Metadata refresh failed"
                 )
             }
         }

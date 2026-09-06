@@ -1,12 +1,24 @@
 """FastAPI routers for HTML UI views and REST API endpoints."""
 
+import json
 import logging
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+import httpx
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine, desc, func, select
@@ -16,15 +28,19 @@ from tveaker.auth.trakt_oauth import TraktOAuth, TraktOAuthError
 from tveaker.clock import Clock
 from tveaker.config import Settings
 from tveaker.db import get_db_session
+from tveaker.episode_catalog import get_show_progress_catalog
 from tveaker.estimator.estimator import ShowFinishEstimator
+from tveaker.estimator.queries import get_show_episode_counts, is_episode_released
 from tveaker.models import (
     Account,
     Episode,
     MediaItem,
+    NowWatching,
     RecommendationFeedback,
     RecommendationRun,
     SyncCursor,
     SyncRun,
+    TrackedShow,
     WatchEvent,
 )
 from tveaker.recommender.engine import RecommendationEngine
@@ -39,8 +55,13 @@ logger = logging.getLogger(__name__)
 templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
 
+ANDROID_APK_PATH = Path("android/app/build/outputs/apk/debug/app-debug.apk")
+ANDROID_APK_METADATA_PATH = Path("android/app/build/outputs/apk/debug/output-metadata.json")
+
 ui_router = APIRouter()
 api_router = APIRouter(prefix="/api/v1")
+
+ARTWORK_HOSTS = {"static.tvmaze.com", "image.tmdb.org"}
 
 
 # ---------------------------------------------------------
@@ -62,6 +83,43 @@ class FeedbackRequest(BaseModel):
     action: Literal["accepted", "not_now", "not_interested"]
 
 
+class NowWatchingSelectionRequest(BaseModel):
+    episode_id: int = Field(gt=0)
+
+
+def _now_watching_payload(session: Any, account_id: int = 1) -> dict[str, Any] | None:
+    """Return the one locally selected episode, if the account has one."""
+    selection = session.get(NowWatching, account_id)
+    if selection is None:
+        return None
+
+    episode = session.get(Episode, selection.episode_id)
+    if episode is None:
+        return None
+    show = session.get(MediaItem, episode.show_id)
+    if show is None:
+        return None
+    tracked = session.get(TrackedShow, (account_id, show.id))
+    catalog = get_show_progress_catalog(
+        session=session,
+        account_id=account_id,
+        show_id=show.id,
+        include_specials=tracked.include_specials if tracked is not None else False,
+    )
+    if episode.id not in {candidate.id for candidate in catalog.episodes}:
+        return None
+
+    return {
+        "show_id": show.id,
+        "show_title": show.title,
+        "episode_id": episode.id,
+        "season_number": episode.season_number,
+        "episode_number": episode.episode_number,
+        "episode_title": episode.title,
+        "runtime_minutes": episode.runtime_minutes,
+    }
+
+
 # ---------------------------------------------------------
 # HTML UI Routes
 # ---------------------------------------------------------
@@ -72,9 +130,14 @@ def view_dashboard(request: Request) -> HTMLResponse:
 
     with get_db_session(db_engine) as session:
         account = session.get(Account, 1)
+        now_watching = _now_watching_payload(session)
 
     estimator = ShowFinishEstimator(db_engine=db_engine, clock=clock)
-    estimates = estimator.estimate_all(status="watching")
+    estimates = [
+        estimate
+        for estimate in estimator.estimate_all(status="watching")
+        if estimate.remaining_episodes > 0
+    ]
 
     recommender = RecommendationEngine(db_engine=db_engine, clock=clock)
     rec_result = recommender.recommend(context=RankingContext(intent="auto"), limit=6)
@@ -88,6 +151,7 @@ def view_dashboard(request: Request) -> HTMLResponse:
             "estimates": estimates,
             "recommendations": rec_result.items,
             "run_id": rec_result.run_id,
+            "now_watching": now_watching,
         },
     )
 
@@ -438,14 +502,92 @@ def api_sync_trigger(request: Request, payload: SyncTriggerRequest) -> dict[str,
 
 @api_router.get("/shows")
 def api_list_shows(
-    request: Request, status: TrackingStatus | None = Query(default=None)
+    request: Request,
+    status: TrackingStatus | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=500),
 ) -> list[dict[str, Any]]:
     db_engine: Engine = request.app.state.db_engine
     clock: Clock = request.app.state.clock
 
     estimator = ShowFinishEstimator(db_engine=db_engine, clock=clock)
     estimates = estimator.estimate_all(status=status)
+    if limit is not None:
+        estimates = estimates[:limit]
     return [asdict(e) for e in estimates]
+
+
+@api_router.get("/now-watching")
+def api_get_now_watching(request: Request) -> dict[str, Any] | None:
+    """Return the exact local episode the user has selected to watch now."""
+    db_engine: Engine = request.app.state.db_engine
+    with get_db_session(db_engine) as session:
+        return _now_watching_payload(session)
+
+
+@api_router.put("/now-watching")
+def api_set_now_watching(
+    request: Request, payload: NowWatchingSelectionRequest
+) -> dict[str, Any]:
+    """Choose one released, unwatched episode as the local now-watching target."""
+    db_engine: Engine = request.app.state.db_engine
+    clock: Clock = request.app.state.clock
+    now = clock.now()
+
+    with get_db_session(db_engine) as session:
+        episode = session.get(Episode, payload.episode_id)
+        if episode is None:
+            raise HTTPException(status_code=404, detail="Episode not found.")
+        tracked = session.get(TrackedShow, (1, episode.show_id))
+        catalog = get_show_progress_catalog(
+            session=session,
+            account_id=1,
+            show_id=episode.show_id,
+            include_specials=tracked.include_specials if tracked is not None else False,
+        )
+        if episode.id not in {candidate.id for candidate in catalog.episodes}:
+            raise HTTPException(
+                status_code=409,
+                detail="Episode is outside the trusted Trakt progress catalog.",
+            )
+        is_available = (
+            is_episode_released(episode.first_aired, now)
+            or episode.id in catalog.source_confirmed_episode_ids
+        )
+        if not is_available:
+            raise HTTPException(status_code=400, detail="Episode has not been released yet.")
+
+        watched = session.execute(
+            select(WatchEvent.history_id)
+            .where(WatchEvent.account_id == 1, WatchEvent.episode_id == episode.id)
+            .limit(1)
+        ).scalar_one_or_none()
+        if watched is not None:
+            raise HTTPException(status_code=409, detail="Episode is already marked watched.")
+
+        selection = session.get(NowWatching, 1)
+        if selection is None:
+            selection = NowWatching(account_id=1, episode_id=episode.id, selected_at=now)
+            session.add(selection)
+        else:
+            selection.episode_id = episode.id
+            selection.selected_at = now
+        session.flush()
+
+        selected = _now_watching_payload(session)
+        if selected is None:
+            raise HTTPException(status_code=500, detail="Could not save now-watching selection.")
+        return selected
+
+
+@api_router.delete("/now-watching", status_code=204)
+def api_clear_now_watching(request: Request) -> Response:
+    """Clear the local now-watching selection without creating a watch event."""
+    db_engine: Engine = request.app.state.db_engine
+    with get_db_session(db_engine) as session:
+        selection = session.get(NowWatching, 1)
+        if selection is not None:
+            session.delete(selection)
+    return Response(status_code=204)
 
 
 @api_router.patch("/shows/{show_id}")
@@ -476,6 +618,14 @@ def api_quick_scrobble(request: Request, show_id: int) -> dict[str, Any]:
     now = clock.now()
 
     with get_db_session(db_engine) as session:
+        tracked = session.get(TrackedShow, (1, show_id))
+        include_specials = tracked.include_specials if tracked is not None else False
+        catalog = get_show_progress_catalog(
+            session=session,
+            account_id=1,
+            show_id=show_id,
+            include_specials=include_specials,
+        )
         watched_ep_ids = set(
             session.execute(
                 select(WatchEvent.episode_id)
@@ -489,30 +639,34 @@ def api_quick_scrobble(request: Request, show_id: int) -> dict[str, Any]:
             .all()
         )
 
-        unwatched_ep = (
-            session.execute(
-                select(Episode)
-                .where(
-                    Episode.show_id == show_id,
-                    Episode.season_number > 0,
-                    Episode.id.not_in(watched_ep_ids),
+        unwatched_ep = next(
+            (
+                episode
+                for episode in catalog.episodes
+                if episode.id not in watched_ep_ids
+                and (
+                    is_episode_released(episode.first_aired, now)
+                    or episode.id in catalog.source_confirmed_episode_ids
                 )
-                .order_by(Episode.season_number.asc(), Episode.episode_number.asc())
-            )
-            .scalars()
-            .first()
+            ),
+            None,
         )
 
         if unwatched_ep is None:
             raise HTTPException(
-                status_code=400, detail="No unwatched episodes remaining for this show."
+                status_code=400,
+                detail="No released unwatched episodes remaining for this show.",
             )
 
         max_hist_id = (
             session.execute(select(func.coalesce(func.max(WatchEvent.history_id), 0))).scalar_one()
             or 0
         )
-        local_hist_id = max(max_hist_id + 1, 9000000000) if max_hist_id < 9000000000 else max_hist_id + 1
+        local_hist_id = (
+            max(max_hist_id + 1, 9000000000)
+            if max_hist_id < 9000000000
+            else max_hist_id + 1
+        )
 
         event = WatchEvent(
             history_id=local_hist_id,
@@ -522,6 +676,9 @@ def api_quick_scrobble(request: Request, show_id: int) -> dict[str, Any]:
             watched_at=now,
         )
         session.add(event)
+        selection = session.get(NowWatching, 1)
+        if selection is not None and selection.episode_id == unwatched_ep.id:
+            session.delete(selection)
         session.flush()
 
         ep_info = {
@@ -545,10 +702,20 @@ def api_quick_scrobble(request: Request, show_id: int) -> dict[str, Any]:
 def api_get_unwatched_episodes(request: Request, show_id: int) -> dict[str, Any]:
     """Get the exact list of remaining unwatched episodes for a show."""
     db_engine: Engine = request.app.state.db_engine
+    clock: Clock = request.app.state.clock
+    now = clock.now()
     with get_db_session(db_engine) as session:
         media = session.get(MediaItem, show_id)
         if media is None:
             raise HTTPException(status_code=404, detail=f"Show {show_id} not found.")
+        tracked = session.get(TrackedShow, (1, show_id))
+        include_specials = tracked.include_specials if tracked is not None else False
+        catalog = get_show_progress_catalog(
+            session=session,
+            account_id=1,
+            show_id=show_id,
+            include_specials=include_specials,
+        )
 
         # Get watched episode IDs
         watched_ep_ids = set(
@@ -564,17 +731,14 @@ def api_get_unwatched_episodes(request: Request, show_id: int) -> dict[str, Any]
             .all()
         )
 
-        all_eps = (
-            session.execute(
-                select(Episode)
-                .where(
-                    Episode.show_id == show_id,
-                    Episode.season_number > 0,
-                )
-                .order_by(Episode.season_number.asc(), Episode.episode_number.asc())
-            )
-            .scalars()
-            .all()
+        all_eps = catalog.episodes
+
+        counts = get_show_episode_counts(
+            session=session,
+            account_id=1,
+            show_id=show_id,
+            now=now,
+            include_specials=include_specials,
         )
 
         unwatched = [
@@ -584,18 +748,16 @@ def api_get_unwatched_episodes(request: Request, show_id: int) -> dict[str, Any]
                 "episode_number": ep.episode_number,
                 "title": ep.title,
                 "overview": ep.overview,
-                "runtime_minutes": ep.runtime_minutes or media.runtime_minutes or 42,
+                "runtime_minutes": ep.runtime_minutes or counts.avg_runtime_minutes,
                 "first_aired": ep.first_aired.isoformat() if ep.first_aired else None,
             }
             for ep in all_eps
             if ep.id not in watched_ep_ids
+            and (
+                is_episode_released(ep.first_aired, now)
+                or ep.id in catalog.source_confirmed_episode_ids
+            )
         ]
-
-        total_unwatched_mins = sum(
-            int(ep["runtime_minutes"])
-            for ep in unwatched
-            if isinstance(ep["runtime_minutes"], (int, float))
-        )
 
         return {
             "show_id": show_id,
@@ -604,10 +766,15 @@ def api_get_unwatched_episodes(request: Request, show_id: int) -> dict[str, Any]
             "poster_url": media.poster_url,
             "backdrop_url": media.backdrop_url,
             "genres": media.genres,
-            "total_episodes": len(all_eps),
-            "watched_episodes": len(all_eps) - len(unwatched),
-            "remaining_episodes": len(unwatched),
-            "unwatched_minutes": total_unwatched_mins,
+            "include_specials": include_specials,
+            "total_episodes": counts.total_episodes,
+            "aired_episodes": counts.aired_episodes,
+            "unaired_episodes": counts.unaired_episodes,
+            "unresolved_episodes": counts.unresolved_episodes,
+            "watched_episodes": counts.watched_episodes,
+            "remaining_episodes": counts.remaining_episodes,
+            "unwatched_minutes": counts.unwatched_minutes,
+            "next_air_date": counts.next_air_date.isoformat() if counts.next_air_date else None,
             "unwatched_episodes": unwatched,
         }
 
@@ -623,12 +790,41 @@ def api_watch_episode(request: Request, show_id: int, episode_id: int) -> dict[s
         ep = session.get(Episode, episode_id)
         if ep is None or ep.show_id != show_id:
             raise HTTPException(status_code=404, detail="Episode not found for this show.")
+        tracked = session.get(TrackedShow, (1, show_id))
+        catalog = get_show_progress_catalog(
+            session=session,
+            account_id=1,
+            show_id=show_id,
+            include_specials=tracked.include_specials if tracked is not None else False,
+        )
+        if ep.id not in {candidate.id for candidate in catalog.episodes}:
+            raise HTTPException(
+                status_code=409,
+                detail="Episode is outside the trusted Trakt progress catalog.",
+            )
+        is_available = (
+            is_episode_released(ep.first_aired, now)
+            or ep.id in catalog.source_confirmed_episode_ids
+        )
+        if not is_available:
+            raise HTTPException(status_code=400, detail="Episode has not been released yet.")
+        watched = session.execute(
+            select(WatchEvent.history_id)
+            .where(WatchEvent.account_id == 1, WatchEvent.episode_id == ep.id)
+            .limit(1)
+        ).scalar_one_or_none()
+        if watched is not None:
+            raise HTTPException(status_code=409, detail="Episode is already marked watched.")
 
         max_hist_id = (
             session.execute(select(func.coalesce(func.max(WatchEvent.history_id), 0))).scalar_one()
             or 0
         )
-        local_hist_id = max(max_hist_id + 1, 9000000000) if max_hist_id < 9000000000 else max_hist_id + 1
+        local_hist_id = (
+            max(max_hist_id + 1, 9000000000)
+            if max_hist_id < 9000000000
+            else max_hist_id + 1
+        )
 
         event = WatchEvent(
             history_id=local_hist_id,
@@ -638,6 +834,9 @@ def api_watch_episode(request: Request, show_id: int, episode_id: int) -> dict[s
             watched_at=now,
         )
         session.add(event)
+        selection = session.get(NowWatching, 1)
+        if selection is not None and selection.episode_id == ep.id:
+            session.delete(selection)
         session.flush()
 
     estimator = ShowFinishEstimator(db_engine=db_engine, clock=clock)
@@ -755,23 +954,66 @@ def api_get_history(
 # ---------------------------------------------------------
 # OTA App Update Endpoints
 # ---------------------------------------------------------
+@api_router.get("/artwork")
+async def api_proxy_artwork(url: str = Query(...)) -> Response:
+    """Serve trusted TVMaze art through the LAN backend for offline companions."""
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in ARTWORK_HOSTS:
+        raise HTTPException(status_code=400, detail="Unsupported artwork host.")
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            upstream = await client.get(url)
+            upstream.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Artwork is temporarily unavailable.") from exc
+    content_type = upstream.headers.get("content-type", "image/jpeg")
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=502, detail="Artwork source returned invalid content.")
+    return Response(
+        content=upstream.content,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@api_router.post("/metadata/hydrate")
+def api_hydrate_missing_metadata(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    limit: int = Query(default=75, ge=1, le=250),
+) -> dict[str, Any]:
+    """Queue an immediate bounded pass for missing media metadata."""
+    from tveaker.metadata import hydrate_all_metadata
+
+    background_tasks.add_task(hydrate_all_metadata, request.app.state.db_engine, limit)
+    return {"status": "queued", "limit": limit}
+
+
 @api_router.get("/app/version")
 @ui_router.get("/apks/latest.json")
 def api_get_app_version() -> dict[str, Any]:
     """Return the latest available Android APK build version and release notes."""
-    apk_path = Path("android/app/build/outputs/apk/debug/app-debug.apk")
-    size_bytes = apk_path.stat().st_size if apk_path.exists() else None
+    if not ANDROID_APK_PATH.exists() or not ANDROID_APK_METADATA_PATH.exists():
+        raise HTTPException(status_code=503, detail="Android OTA artifact is not available.")
+
+    try:
+        metadata = json.loads(ANDROID_APK_METADATA_PATH.read_text(encoding="utf-8"))
+        artifact = metadata["elements"][0]
+        version_code = int(artifact["versionCode"])
+        version_name = str(artifact["versionName"])
+    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=503, detail="Android OTA metadata is invalid.") from exc
 
     return {
-        "version_code": 7,
-        "version_name": "1.5.0",
+        "version_code": version_code,
+        "version_name": version_name,
         "apk_url": "/api/v1/app/download-apk",
         "changelog": (
-            "Editorial dashboard redesign across web and Android, with light and dark themes, "
-            "finish forecasts, compact recommendations, and reliable OTA delivery."
+            "Offline caching for shows, estimates, now-watching, and unwatched "
+            "episodes when away from home or disconnected."
         ),
-        "release_date": "2026-08-30",
-        "apk_size_bytes": size_bytes,
+        "release_date": "2026-09-06",
+        "apk_size_bytes": ANDROID_APK_PATH.stat().st_size,
     }
 
 
@@ -783,12 +1025,13 @@ def api_download_apk() -> Any:
     """Download the latest TVeaker Android APK for OTA installation."""
     from fastapi.responses import FileResponse
 
-    apk_path = Path("android/app/build/outputs/apk/debug/app-debug.apk")
-    if not apk_path.exists():
+    if not ANDROID_APK_PATH.exists():
         raise HTTPException(status_code=404, detail="APK build not found on server.")
 
+    version = api_get_app_version()["version_name"]
+
     return FileResponse(
-        path=str(apk_path),
+        path=str(ANDROID_APK_PATH),
         media_type="application/vnd.android.package-archive",
-        filename="tveaker-v1.5.0.apk",
+        filename=f"tveaker-v{version}.apk",
     )

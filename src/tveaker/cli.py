@@ -5,11 +5,17 @@ import logging
 import click
 from sqlalchemy import text
 
-from tveaker.auth.token_store import KeyringTokenStore
+from tveaker.auth.token_store import create_token_store
 from tveaker.auth.trakt_oauth import TraktOAuth
 from tveaker.backup import online_sqlite_backup
 from tveaker.config import get_settings
-from tveaker.db import create_db_engine, get_db_session
+from tveaker.db import create_db_engine, get_db_session, init_db
+from tveaker.gateway import (
+    CloudflareGateway,
+    GatewayUnavailableError,
+    PhoneGateway,
+    TailscaleGateway,
+)
 from tveaker.models import (
     Account,
     Episode,
@@ -55,7 +61,7 @@ def doctor() -> None:
         click.echo(f"  [SQLite Integrity]    : ERROR: {e}")
 
     # 2. Token Store Check
-    token_store = KeyringTokenStore()
+    token_store = create_token_store(secret_key=settings.secret_key)
     token = token_store.get_token()
     if token:
         expired = token.is_expired()
@@ -99,6 +105,7 @@ def import_export(zip_path: str) -> None:
     """Import data from a Trakt GDPR/Account export ZIP file."""
     settings = get_settings()
     engine = create_db_engine(settings.database_url)
+    init_db(engine)
     importer = TraktExportImporter(db_engine=engine)
 
     click.echo(f"Importing Trakt export from {zip_path}...")
@@ -127,7 +134,7 @@ def sync(mode: str) -> None:
     """Execute a manual synchronization against Trakt API."""
     settings = get_settings()
     engine = create_db_engine(settings.database_url)
-    token_store = KeyringTokenStore()
+    token_store = create_token_store(secret_key=settings.secret_key)
     oauth = TraktOAuth(settings=settings, token_store=token_store)
     client = TraktClient(settings=settings, token_store=token_store, oauth=oauth)
     syncer = AccountSync(db_engine=engine, trakt_client=client)
@@ -186,6 +193,69 @@ def backup(dest: str) -> None:
     click.echo(f"Backup created successfully: {res.destination_path} ({res.bytes_written} bytes)")
 
 
+@cli.command("phone-gateway")
+@click.option("--port", type=click.IntRange(1, 65535), default=8000, show_default=True)
+@click.option(
+    "--provider",
+    type=click.Choice(["cloudflare", "tailscale"], case_sensitive=False),
+    default="cloudflare",
+    show_default=True,
+)
+@click.option(
+    "--cloudflare-tunnel-token",
+    envvar="TVEAKER_CLOUDFLARE_TUNNEL_TOKEN",
+    metavar="TOKEN",
+    help=(
+        "Named Cloudflare tunnel token. Prefer the environment variable so it is not kept "
+        "in shell history."
+    ),
+)
+@click.option(
+    "--public-url",
+    help="Complete HTTPS hostname configured for a named Cloudflare tunnel.",
+)
+def phone_gateway(
+    port: int,
+    provider: str,
+    cloudflare_tunnel_token: str | None,
+    public_url: str | None,
+) -> None:
+    """Create an online HTTPS gateway for the Android companion."""
+    if provider == "tailscale":
+        if cloudflare_tunnel_token or public_url:
+            raise click.UsageError("Cloudflare options cannot be used with --provider tailscale.")
+        try:
+            gateway = TailscaleGateway().provision(port=port)
+        except GatewayUnavailableError as exc:
+            raise click.ClickException(str(exc)) from exc
+
+        click.echo("Private TVeaker phone gateway is ready:")
+        click.echo(f"  {gateway.url}")
+        click.echo("Open this URL while Tailscale is connected on your phone.")
+        return
+
+    def announce(gateway: PhoneGateway) -> None:
+        click.echo("Online TVeaker phone gateway is ready:")
+        click.echo(f"  {gateway.url}")
+        if cloudflare_tunnel_token:
+            click.echo("Named Cloudflare tunnel is running. Keep this terminal open.")
+        else:
+            click.echo(
+                "This temporary public URL changes when this command stops. Do not share it."
+            )
+
+    click.echo("Opening a Cloudflare HTTPS gateway. Keep this terminal open while using the phone.")
+    try:
+        CloudflareGateway().serve(
+            port=port,
+            on_ready=announce,
+            tunnel_token=cloudflare_tunnel_token,
+            public_url=public_url,
+        )
+    except GatewayUnavailableError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
 @cli.command()
 @click.option("--host", type=str, default="127.0.0.1", help="Host address to bind to.")
 @click.option("--port", type=int, default=8000, help="Port to listen on.")
@@ -198,14 +268,20 @@ def serve(host: str, port: int, scheduler: bool) -> None:
 
     settings = get_settings()
     engine = create_db_engine(settings.database_url)
-    token_store = KeyringTokenStore()
+    token_store = create_token_store(secret_key=settings.secret_key)
     oauth = TraktOAuth(settings=settings, token_store=token_store)
     client = TraktClient(settings=settings, token_store=token_store, oauth=oauth)
     syncer = AccountSync(db_engine=engine, trakt_client=client)
 
     sched = None
     if scheduler:
-        sched = SyncScheduler(account_sync=syncer)
+        from tveaker.metadata import hydrate_all_metadata
+
+        sched = SyncScheduler(
+            account_sync=syncer,
+            metadata_hydrator=lambda: hydrate_all_metadata(engine),
+            metadata_refresh_interval_seconds=settings.metadata_refresh_interval_hours * 3600,
+        )
         sched.start()
 
     try:

@@ -13,9 +13,11 @@ from tveaker.auth.trakt_oauth import TraktOAuth
 from tveaker.clock import FrozenClock
 from tveaker.config import Settings
 from tveaker.db import Base, _configure_sqlite_connection, get_db_session
-from tveaker.models import Episode, MediaItem, WatchEvent
+from tveaker.models import Account, Episode, MediaItem, WatchEvent
 from tveaker.sync.importer import AccountSync
+from tveaker.sync.reconcile import upsert_episode
 from tveaker.trakt.client import TraktClient
+from tveaker.trakt.schemas import TraktEpisode
 
 
 @pytest.fixture
@@ -168,8 +170,70 @@ def test_specials_and_future_episodes_catalog(catalog_env):
 
         s1_ep2 = next(e for e in episodes if e.episode_number == 2)
         assert s1_ep2.runtime_minutes == 50
+        assert s1_ep2.first_aired is not None
+        assert s1_ep2.first_aired.date() == datetime(2026, 9, 8).date()
 
         # Verify historical watch event was preserved
         events = session.execute(select(WatchEvent)).scalars().all()
         assert len(events) == 1
         assert events[0].history_id == 111
+
+
+def test_catalog_upsert_adopts_a_legacy_synthetic_episode(catalog_env):
+    """A trusted Trakt catalog row must reclaim old local history by coordinate."""
+    _, engine, _ = catalog_env
+    now = datetime(2026, 8, 29, 12, 0, 0, tzinfo=UTC)
+
+    with get_db_session(engine) as session:
+        session.add(
+            Account(
+                id=1,
+                trakt_uuid="u1",
+                username="test",
+                timezone="UTC",
+                connected_at=now,
+            )
+        )
+        session.add(MediaItem(id=1, media_type="show", trakt_id=500, title="Sci-Fi Show"))
+        session.add(
+            Episode(
+                id=50,
+                show_id=1,
+                trakt_id=-5001,
+                season_number=1,
+                episode_number=1,
+                title="Provider-only row",
+            )
+        )
+        session.add(
+            WatchEvent(
+                history_id=111,
+                account_id=1,
+                watched_at=now,
+                action="watch",
+                episode_id=50,
+            )
+        )
+
+    incoming = TraktEpisode.model_validate(
+        {
+            "season": 1,
+            "number": 1,
+            "title": "Trusted Episode",
+            "ids": {"trakt": 5001},
+            "runtime": 45,
+            "first_aired": "2026-08-01T00:00:00.000Z",
+        }
+    )
+    with get_db_session(engine) as session:
+        episode = upsert_episode(session, 1, incoming)
+        assert episode.id == 50
+
+    with get_db_session(engine) as session:
+        episode = session.get(Episode, 50)
+        assert episode is not None
+        assert episode.trakt_id == 5001
+        assert episode.title == "Trusted Episode"
+        event = session.get(WatchEvent, 111)
+        assert event is not None
+        assert event.episode_id == 50

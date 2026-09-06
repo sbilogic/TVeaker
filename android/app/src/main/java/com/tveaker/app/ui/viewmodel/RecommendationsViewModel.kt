@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 data class RecommendationsUiState(
@@ -18,7 +19,8 @@ data class RecommendationsUiState(
     val selectedBudget: Int? = null,
     val selectedIntent: String = "auto",
     val errorMessage: String? = null,
-    val currentServerUrl: String = ""
+    val currentServerUrl: String = "",
+    val isOffline: Boolean = false
 )
 
 class RecommendationsViewModel(
@@ -26,14 +28,22 @@ class RecommendationsViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        RecommendationsUiState(currentServerUrl = repository.currentBaseUrl.value)
+        RecommendationsUiState(
+            currentServerUrl = repository.currentBaseUrl.value,
+            isOffline = repository.isOffline.value
+        )
     )
     val uiState: StateFlow<RecommendationsUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            repository.isOffline.collectLatest { isOffline ->
+                _uiState.value = _uiState.value.copy(isOffline = isOffline)
+            }
+        }
         loadRecommendations()
         viewModelScope.launch {
-            repository.currentBaseUrl.collectLatest { newUrl ->
+            repository.currentBaseUrl.drop(1).collectLatest { newUrl ->
                 _uiState.value = _uiState.value.copy(currentServerUrl = newUrl)
                 loadRecommendations()
             }
@@ -64,12 +74,14 @@ class RecommendationsViewModel(
                     isLoading = false,
                     items = res?.items ?: emptyList(),
                     runId = res?.runId,
-                    errorMessage = null
+                    errorMessage = null,
+                    isOffline = repository.isOffline.value
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to connect to ${repository.currentBaseUrl.value}"
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to connect to ${repository.currentBaseUrl.value}",
+                    isOffline = repository.isOffline.value
                 )
             }
         }

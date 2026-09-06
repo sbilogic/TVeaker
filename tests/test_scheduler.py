@@ -53,3 +53,28 @@ def test_scheduler_thread_start_stop():
 
     scheduler.stop(timeout=1.0)
     assert scheduler.is_running() is False
+
+
+def test_scheduler_runs_bounded_metadata_refresh_on_its_own_cadence():
+    mock_sync = MagicMock(spec=AccountSync)
+    hydrate = MagicMock()
+    clock = FrozenClock(datetime(2026, 8, 29, 12, 0, 0, tzinfo=UTC))
+    scheduler = SyncScheduler(
+        account_sync=mock_sync,
+        clock=clock,
+        incremental_interval_seconds=900,
+        full_reconcile_interval_seconds=604800,
+        metadata_hydrator=hydrate,
+        metadata_refresh_interval_seconds=3600,
+    )
+
+    scheduler.run_pending()
+    hydrate.assert_called_once_with()
+
+    clock.advance(900)
+    scheduler.run_pending()
+    hydrate.assert_called_once_with()
+
+    clock.advance(2700)
+    scheduler.run_pending()
+    assert hydrate.call_count == 2

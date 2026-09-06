@@ -34,6 +34,16 @@ class Settings(BaseSettings):
     )
     trakt_api_base_url: str = "https://api.trakt.tv"
 
+    # Optional richer media metadata provider. A TMDB bearer token is preferred;
+    # the legacy v3 API key remains supported for personal installations.
+    tmdb_access_token: str = Field(default="", alias="TMDB_ACCESS_TOKEN")
+    tmdb_api_key: str = Field(default="", alias="TMDB_API_KEY")
+    metadata_refresh_interval_hours: int = 24
+
+    @property
+    def is_tmdb_configured(self) -> bool:
+        return bool(self.tmdb_access_token.strip() or self.tmdb_api_key.strip())
+
     @property
     def database_url(self) -> str:
         db_path = Path(self.database_path)

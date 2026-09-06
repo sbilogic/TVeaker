@@ -18,7 +18,8 @@ interface TVeakerApiService {
 
     @GET("api/v1/shows")
     suspend fun getShows(
-        @Query("status") status: String? = null
+        @Query("status") status: String? = null,
+        @Query("limit") limit: Int? = null
     ): List<ShowEstimateDto>
 
     @PATCH("api/v1/shows/{show_id}")
@@ -31,6 +32,17 @@ interface TVeakerApiService {
     suspend fun getUnwatchedEpisodes(
         @Path("show_id") showId: Int
     ): UnwatchedEpisodesResponseDto
+
+    @GET("api/v1/now-watching")
+    suspend fun getNowWatching(): NowWatchingDto?
+
+    @PUT("api/v1/now-watching")
+    suspend fun selectNowWatching(
+        @Body request: NowWatchingSelectionRequest
+    ): NowWatchingDto
+
+    @DELETE("api/v1/now-watching")
+    suspend fun clearNowWatching()
 
     @POST("api/v1/shows/{show_id}/quick-scrobble")
     suspend fun quickScrobble(
@@ -60,6 +72,9 @@ interface TVeakerApiService {
         @Body request: SyncTriggerRequest
     ): SyncReportDto
 
+    @POST("api/v1/metadata/hydrate")
+    suspend fun hydrateMissingMetadata(): MetadataHydrationDto
+
     @GET("api/v1/app/version")
     suspend fun getAppVersion(): AppVersionDto
 
@@ -68,11 +83,11 @@ interface TVeakerApiService {
     suspend fun downloadApk(): ResponseBody
 
     companion object {
-        const val DEFAULT_BASE_URL = "http://192.168.1.33:8000/"
+        const val DEFAULT_BASE_URL = GatewayUrl.UNCONFIGURED_BASE_URL
 
         fun create(baseUrl: String = DEFAULT_BASE_URL): TVeakerApiService {
             val logging = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                level = HttpLoggingInterceptor.Level.BASIC
             }
 
             val client = OkHttpClient.Builder()

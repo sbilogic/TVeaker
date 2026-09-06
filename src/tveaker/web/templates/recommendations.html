@@ -1,94 +1,17 @@
 {% extends "base.html" %}
-
-{% block title %}Recommendations{% endblock %}
-
+{% block title %}Discover{% endblock %}
 {% block content %}
-<div class="header-bar">
-  <div>
-    <h1 class="page-title">What to Watch Next</h1>
-    <p class="page-subtitle">Deterministic, sub-10ms recommendations computed locally from your viewing taste profile</p>
-  </div>
-</div>
-
-<!-- Apple Filter Toolbar -->
-<form method="GET" action="/recommendations" style="background: var(--bg-surface); backdrop-filter: blur(32px) saturate(180%); border: 1px solid var(--border-subtle); padding: 22px 28px; border-radius: var(--radius-lg); margin-bottom: 32px; display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; box-shadow: var(--shadow-card);">
-  <div style="flex: 1; min-width: 220px;">
-    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-      Available Time Budget
-    </label>
-    <select name="time_budget_minutes" style="width: 100%; background: var(--bg-surface-elevated); color: #fff; border: 1px solid var(--border-medium); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.9rem; font-family: var(--font-sans); cursor: pointer;">
-      <option value="">Any duration</option>
-      <option value="30" {% if time_budget == 30 %}selected{% endif %}>~30 minutes (Quick Episode)</option>
-      <option value="45" {% if time_budget == 45 %}selected{% endif %}>~45 minutes (Standard Episode)</option>
-      <option value="60" {% if time_budget == 60 %}selected{% endif %}>~60 minutes (Hour Episode)</option>
-      <option value="90" {% if time_budget == 90 %}selected{% endif %}>~90 minutes (Short Movie)</option>
-      <option value="120" {% if time_budget == 120 %}selected{% endif %}>~120 minutes (Feature Film)</option>
-    </select>
-  </div>
-
-  <div style="flex: 1; min-width: 220px;">
-    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-      Viewing Intent
-    </label>
-    <select name="intent" style="width: 100%; background: var(--bg-surface-elevated); color: #fff; border: 1px solid var(--border-medium); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.9rem; font-family: var(--font-sans); cursor: pointer;">
-      <option value="auto" {% if intent == 'auto' %}selected{% endif %}>Auto (Balanced Intent)</option>
-      <option value="finish_show" {% if intent == 'finish_show' %}selected{% endif %}>Finish In-Progress Show</option>
-      <option value="start_new" {% if intent == 'start_new' %}selected{% endif %}>Start Something Fresh</option>
-      <option value="movie" {% if intent == 'movie' %}selected{% endif %}>Feature Movie Only</option>
-      <option value="show" {% if intent == 'show' %}selected{% endif %}>TV Series Only</option>
-    </select>
-  </div>
-
-  <div>
-    <button type="submit" class="btn btn-primary" style="height: 44px;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-      <span>Apply Criteria</span>
-    </button>
-  </div>
-</form>
-
-{% if recommendations %}
-<div class="grid grid-cols-3">
-  {% for rec in recommendations %}
-  <div class="card" id="rec-{{ rec.candidate_id | replace(':', '-') }}">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 10px;">
-      <div>
-        <h3 class="card-title">{{ rec.title }}</h3>
-        <div class="card-meta">
-          <span class="badge badge-accent">{{ rec.media_type }}</span>
-          {% if rec.runtime_minutes %}<span>{{ rec.runtime_minutes }} min</span>{% endif %}
-          {% if rec.year %}<span>• {{ rec.year }}</span>{% endif %}
-        </div>
-      </div>
-      <div style="background: rgba(168, 85, 247, 0.18); color: var(--accent-purple); border: 1px solid rgba(168, 85, 247, 0.35); padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.78rem; font-weight: 900;">
-        {{ (rec.score * 100) | round(0) }}% MATCH
-      </div>
-    </div>
-
-    <div style="margin: 12px 0; font-size: 0.84rem; color: var(--text-secondary); line-height: 1.5; background: rgba(0, 0, 0, 0.35); padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-      <span style="color: var(--accent-cyan); font-weight: 700;">Why match:</span> {{ rec.explanation }}
-    </div>
-
-    <!-- Feedback Action Buttons -->
-    <div style="display: flex; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-subtle);">
-      <button class="btn btn-sm btn-primary" style="flex-grow: 1;" onclick="sendFeedback({{ run_id }}, '{{ rec.candidate_id }}', 'accepted')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-        Watch
-      </button>
-      <button class="btn btn-sm btn-secondary" onclick="sendFeedback({{ run_id }}, '{{ rec.candidate_id }}', 'not_now')">Later</button>
-      <button class="btn btn-sm btn-secondary" style="color: var(--danger);" onclick="sendFeedback({{ run_id }}, '{{ rec.candidate_id }}', 'not_interested')">✕</button>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% else %}
-<div class="card" style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">
-  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom: 16px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-  <h3 style="color: #fff; font-size: 1.2rem; font-weight: 800; margin-bottom: 8px;">No Candidates Matched Filter</h3>
-  <p style="font-size: 0.9rem;">Try loosening your time budget or changing the viewing intent.</p>
-</div>
-{% endif %}
-
+<section class="archive-page discover-page">
+  <span class="sr-only">What to Watch Next</span>
+  <header class="archive-header"><div><p class="section-index">03 / CURATED FOR YOU</p><h1>DISCOVER</h1></div><p class="archive-kicker">One confident pick first.<br>Everything else stays quiet.</p></header>
+  <form class="discover-tools" method="GET" action="/recommendations">
+    <label><span>Time tonight</span><select name="time_budget_minutes"><option value="">Any duration</option><option value="30" {% if time_budget == 30 %}selected{% endif %}>30 min</option><option value="45" {% if time_budget == 45 %}selected{% endif %}>45 min</option><option value="60" {% if time_budget == 60 %}selected{% endif %}>1 hour</option><option value="90" {% if time_budget == 90 %}selected{% endif %}>90 min</option><option value="120" {% if time_budget == 120 %}selected{% endif %}>2 hours</option></select></label>
+    <label><span>Intent</span><select name="intent"><option value="auto" {% if intent == 'auto' %}selected{% endif %}>Balanced</option><option value="finish_show" {% if intent == 'finish_show' %}selected{% endif %}>Finish a show</option><option value="start_new" {% if intent == 'start_new' %}selected{% endif %}>Start fresh</option><option value="movie" {% if intent == 'movie' %}selected{% endif %}>Movie</option><option value="show" {% if intent == 'show' %}selected{% endif %}>TV series</option></select></label>
+    <button type="submit">Refine edit <span class="material-symbols-rounded">arrow_forward</span></button>
+  </form>
+  {% if recommendations %}{% set lead = recommendations[0] %}
+  <article class="discover-lead" id="rec-{{ lead.candidate_id|replace(':','-') }}"><div class="discover-lead-art">{% if lead.backdrop_url or lead.poster_url %}<img src="{{ lead.backdrop_url or lead.poster_url }}" alt="{{ lead.title }} poster">{% else %}<span>{{ lead.title }}</span>{% endif %}</div><div class="discover-lead-copy"><p class="section-index">01 / TONIGHT'S PICK</p><h2>{{ lead.title }}</h2><div class="recommendation-meta">{% if lead.year %}<span>{{ lead.year }}</span>{% endif %}<span>{{ lead.media_type }}</span>{% if lead.runtime_minutes %}<span>{{ lead.runtime_minutes }} min</span>{% endif %}<span>{{ (lead.score*100)|round(0)|int }}% match</span></div><p>{{ lead.explanation }}</p><div class="discover-actions"><button onclick="sendFeedback({{ run_id }}, '{{ lead.candidate_id }}', 'accepted')">Add to watchlist <span class="material-symbols-rounded">add</span></button><button onclick="sendFeedback({{ run_id }}, '{{ lead.candidate_id }}', 'not_now')">Not now</button></div></div></article>
+  <div class="discover-ledger"><div class="ledger-heading"><p class="section-index">THE REST OF THE EDIT</p><span>{{ recommendations|length - 1 }} more</span></div>{% for rec in recommendations[1:] %}<article class="discover-entry" id="rec-{{ rec.candidate_id|replace(':','-') }}"><span class="library-number">{{ '%02d'|format(loop.index + 1) }}</span><div class="discover-thumb">{% if rec.poster_url %}<img src="{{ rec.poster_url }}" alt="" loading="lazy">{% else %}<span>{{ rec.title[:1] }}</span>{% endif %}</div><div class="discover-entry-title"><strong>{{ rec.title }}</strong><small>{{ rec.media_type }}{% if rec.runtime_minutes %} · {{ rec.runtime_minutes }} min{% endif %}{% if rec.year %} · {{ rec.year }}{% endif %}</small></div><p>{{ rec.explanation }}</p><strong class="match-score">{{ (rec.score*100)|round(0)|int }}%</strong><div class="discover-entry-actions"><button onclick="sendFeedback({{ run_id }}, '{{ rec.candidate_id }}', 'accepted')">ADD</button><button onclick="sendFeedback({{ run_id }}, '{{ rec.candidate_id }}', 'not_interested')" aria-label="Not interested"><span class="material-symbols-rounded">close</span></button></div></article>{% endfor %}</div>
+  {% else %}<div class="editorial-empty"><p class="section-index">EMPTY EDIT</p><h2>NO MATCH<br>YET.</h2><p>Loosen the time budget or choose a different intent.</p></div>{% endif %}
+</section>
 {% endblock %}

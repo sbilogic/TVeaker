@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
@@ -96,7 +97,7 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = StripeIris)
             }
-        } else if (state.errorMessage != null && state.activeShows.isEmpty()) {
+        } else if (state.errorMessage != null && state.activeShows.isEmpty() && state.nowWatching == null && state.recommendations.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -123,16 +124,14 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
 
-                        Button(
-                            onClick = { viewModel.setServerUrl("http://192.168.1.33:8000/") },
-                            colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("📱 Wi-Fi LAN (192.168.1.33:8000)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
+                        Text(
+                            "Use the online HTTPS gateway from TVeaker Settings. Fixed Wi-Fi IPs are no longer used.",
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         OutlinedButton(
                             onClick = { viewModel.setServerUrl("http://10.0.2.2:8000/") },
@@ -158,6 +157,48 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Offline Indicator Banner
+                if (state.isOffline) {
+                    item {
+                        Surface(
+                            color = BgSurfaceElevated,
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, StripeAmber.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(StripeAmber.copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.CloudOff, contentDescription = null, tint = StripeAmber, modifier = Modifier.size(16.dp))
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "OFFLINE MODE",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = StripeAmber,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Text(
+                                        "Showing cached shows and estimates",
+                                        fontSize = 12.sp,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // OTA Update Available Banner
                 if (state.isNewUpdateAvailable && state.serverVersionInfo != null) {
                     item {
@@ -402,7 +443,8 @@ fun DashboardScreen(viewModel: DashboardViewModel) {
                 onDismiss = { viewModel.dismissEpisodesSheet() },
                 onWatchEpisode = { epId ->
                     viewModel.markEpisodeWatched(unwatchedData.showId, epId)
-                }
+                },
+                onSelectNowWatching = viewModel::selectNowWatching
             )
         }
     }
@@ -549,7 +591,8 @@ fun CleanShowCard(
 fun UnwatchedEpisodesBottomSheet(
     data: UnwatchedEpisodesResponseDto,
     onDismiss: () -> Unit,
-    onWatchEpisode: (Int) -> Unit
+    onWatchEpisode: (Int) -> Unit,
+    onSelectNowWatching: ((Int) -> Unit)? = null
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -659,14 +702,26 @@ fun UnwatchedEpisodesBottomSheet(
                                     }
                                 }
 
-                                Button(
-                                    onClick = { onWatchEpisode(ep.id) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                    modifier = Modifier.height(26.dp),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text("✓ Watched", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    if (onSelectNowWatching != null) {
+                                        OutlinedButton(
+                                            onClick = { onSelectNowWatching(ep.id) },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                            modifier = Modifier.height(26.dp),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text("Watch now", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Button(
+                                        onClick = { onWatchEpisode(ep.id) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        modifier = Modifier.height(26.dp),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text("✓ Watched", color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }

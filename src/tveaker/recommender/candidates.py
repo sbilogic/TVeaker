@@ -10,6 +10,7 @@ from sqlalchemy import Engine, select
 
 from tveaker.clock import Clock, SystemClock
 from tveaker.db import get_db_session
+from tveaker.estimator.queries import get_show_episode_counts
 from tveaker.models import (
     Episode,
     MediaItem,
@@ -252,31 +253,17 @@ class CandidatePoolGenerator:
                 # Compute remaining episodes for shows
                 remaining_eps = None
                 if media.media_type == "show":
-                    all_eps = (
-                        session.execute(
-                            select(Episode.id).where(
-                                Episode.show_id == media.id,
-                                Episode.season_number > 0,
-                            )
-                        )
-                        .scalars()
-                        .all()
+                    tracked = session.get(TrackedShow, (self.account_id, media.id))
+                    counts = get_show_episode_counts(
+                        session=session,
+                        account_id=self.account_id,
+                        show_id=media.id,
+                        now=now_utc,
+                        include_specials=tracked.include_specials if tracked else False,
                     )
-                    watched_eps = set(
-                        session.execute(
-                            select(WatchEvent.episode_id)
-                            .join(Episode, WatchEvent.episode_id == Episode.id)
-                            .where(
-                                WatchEvent.account_id == self.account_id,
-                                Episode.show_id == media.id,
-                            )
-                        )
-                        .scalars()
-                        .all()
-                    )
-                    remaining_eps = len([e for e in all_eps if e not in watched_eps])
-                    if remaining_eps == 0 and len(all_eps) > 0:
-                        # Fully completed show, exclude
+                    remaining_eps = counts.remaining_episodes
+                    if remaining_eps == 0 and counts.total_episodes > 0:
+                        # Completed or only unaired episodes: nothing to watch now.
                         continue
 
                 m_type: Literal["movie", "show"] = (

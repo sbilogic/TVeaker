@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from tveaker.cli import cli
 from tveaker.config import Settings
+from tveaker.gateway import PhoneGateway
 
 
 def test_cli_help():
@@ -89,3 +90,29 @@ def test_cli_recommend(tmp_path: Path):
         assert result.exit_code == 0
         assert "Recommendations (Run #99):" in result.output
         assert "Dune: Part Two" in result.output
+
+
+def test_cli_phone_gateway_runs_cloudflare_by_default():
+    runner = CliRunner()
+    with patch("tveaker.cli.CloudflareGateway.serve") as serve:
+        def announce_url(**kwargs):
+            kwargs["on_ready"](PhoneGateway(url="https://online.example.com/"))
+
+        serve.side_effect = announce_url
+
+        result = runner.invoke(cli, ["phone-gateway"])
+
+    assert result.exit_code == 0
+    assert "https://online.example.com/" in result.output
+    assert "temporary public URL" in result.output
+
+
+def test_cli_phone_gateway_keeps_tailscale_as_an_explicit_legacy_option():
+    runner = CliRunner()
+    with patch("tveaker.cli.TailscaleGateway.provision") as provision:
+        provision.return_value = PhoneGateway(url="https://planetx.example.ts.net/")
+
+        result = runner.invoke(cli, ["phone-gateway", "--provider", "tailscale"])
+
+    assert result.exit_code == 0
+    assert "https://planetx.example.ts.net/" in result.output

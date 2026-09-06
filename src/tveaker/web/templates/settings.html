@@ -1,117 +1,24 @@
 {% extends "base.html" %}
-
-{% block title %}Settings & System Doctor{% endblock %}
-
+{% block title %}Settings{% endblock %}
 {% block content %}
-<div class="header-bar">
-  <div>
-    <h1 class="page-title">Settings & System Doctor</h1>
-    <p class="page-subtitle">Manage your local SQLite database, Android companion app, and Trakt connections</p>
+<section class="archive-page settings-editorial">
+  <span class="sr-only">Settings &amp; System Doctor</span>
+  <header class="archive-header"><div><p class="section-index">05 / CONTROL ROOM</p><h1>SETTINGS</h1></div><p class="archive-kicker">Local first.<br>Your data stays yours.</p></header>
+  {% if msg %}<div class="settings-notice"><span class="material-symbols-rounded">check_circle</span>{{ msg }}</div>{% endif %}
+  {% if error %}<div class="settings-notice settings-notice--error"><span class="material-symbols-rounded">error</span>{{ error }}</div>{% endif %}
+
+  <div class="settings-ledger">
+    <section class="settings-section"><div class="settings-section-title"><p class="section-index">01 / DISPLAY</p><h2>Density</h2><p>Choose how much of your archive fits on screen.</p></div><div class="settings-section-body"><div class="settings-control-row"><div><strong data-density-status>Comfortable</strong><small>Touch targets stay usable in both modes.</small></div><button class="density-toggle" type="button" data-density-toggle aria-label="Switch density" aria-pressed="false"><span class="material-symbols-rounded" data-density-icon>density_medium</span><span data-density-label>Compact</span></button></div></div></section>
+
+    <section class="settings-section"><div class="settings-section-title"><p class="section-index">02 / ANDROID</p><h2>Online companion</h2><p>Install the native app, then use the HTTPS gateway created with <code>tveaker phone-gateway</code>.</p></div><div class="settings-section-body"><div class="settings-control-row"><div><strong>Latest signed build</strong><small>Paste the printed HTTPS URL into Android Settings.</small></div><a class="settings-primary" href="/api/v1/app/download-apk">Download APK <span class="material-symbols-rounded">download</span></a></div></div></section>
+
+    <section class="settings-section"><div class="settings-section-title"><p class="section-index">03 / IMPORT</p><h2>Trakt archive</h2><p>Import the free GDPR export—no VIP plan or API key required.</p></div><div class="settings-section-body"><form class="settings-import-form" method="POST" action="/settings/import-export" enctype="multipart/form-data"><input type="file" name="export_file" accept=".zip"><button class="settings-primary" type="submit">Import ZIP <span class="material-symbols-rounded">upload</span></button></form></div></section>
+
+    <section class="settings-section"><div class="settings-section-title"><p class="section-index">04 / HEALTH</p><h2>System state</h2><p>A live read on the local database and Trakt connection.</p></div><div class="settings-section-body settings-values"><div><span>Database</span><strong class="success-text">Connected</strong></div><div><span>Trakt account</span><strong>{{ account.username if account else 'Not connected' }}</strong></div><div><span>Access mode</span><strong>Read-only sync</strong></div><div><span>Last sync</span><strong>{{ account.last_successful_sync_at.strftime('%d %b %Y · %H:%M') if account and account.last_successful_sync_at else 'Never' }}</strong></div></div></section>
+
+    <section class="settings-section"><div class="settings-section-title"><p class="section-index">05 / SYNC</p><h2>Refresh data</h2><p>Incremental is fast. Full reconcile rechecks the last seven days.</p></div><div class="settings-section-body"><div class="settings-actions"><button class="settings-primary" onclick="triggerSync('incremental')">Incremental sync <span class="material-symbols-rounded">bolt</span></button><button onclick="triggerSync('full')">Full reconcile <span class="material-symbols-rounded">sync</span></button></div>{% if sync_runs %}<p class="settings-last-run">Last run · {{ sync_runs[0].started_at.strftime('%d %b %Y · %H:%M') if sync_runs[0].started_at else 'pending' }}</p>{% endif %}</div></section>
+
+    <section class="settings-section"><div class="settings-section-title"><p class="section-index">06 / ENRICHMENT</p><h2>Metadata refresh</h2><p>Fills missing artwork, runtimes, air dates, and episode details automatically every day.</p></div><div class="settings-section-body"><div class="settings-control-row"><div><strong>{{ 'TMDB + TVMaze' if settings.is_tmdb_configured else 'TVMaze fallback' }}</strong><small>{% if settings.is_tmdb_configured %}TMDB credentials are active.{% else %}Add TMDB_ACCESS_TOKEN to .env for richer movie and series metadata.{% endif %}</small></div><button class="settings-primary" type="button" onclick="triggerMetadataHydration(this)">Fetch missing now <span class="material-symbols-rounded">auto_awesome</span></button></div></div></section>
   </div>
-</div>
-
-{% if msg %}
-<div class="card" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.12); margin-bottom: 24px; color: var(--success); font-weight: 700; display: flex; flex-direction: row; gap: 10px; align-items: center;">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-  <span>{{ msg }}</span>
-</div>
-{% endif %}
-
-<!-- Android Companion App Download Banner -->
-<div class="card" style="border-color: rgba(99, 102, 241, 0.4); background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(56, 189, 248, 0.06) 100%); margin-bottom: 28px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
-    <div style="display: flex; gap: 16px; align-items: center;">
-      <div style="width: 52px; height: 52px; border-radius: var(--radius-md); background: var(--gradient-apple); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-glow-cyan);">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
-      </div>
-      <div>
-        <h3 style="font-size: 1.2rem; font-weight: 800; color: #fff;">
-          TVeaker Native Android Companion App
-        </h3>
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
-          Install the APK (v1.1.0) with in-app OTA updates, velocity sliders, and instant notifications.
-        </p>
-        <div style="font-size: 0.78rem; color: var(--accent-cyan); margin-top: 6px; font-family: var(--font-mono);">
-          LAN Connection URL: <strong>http://192.168.1.33:8000/</strong>
-        </div>
-      </div>
-    </div>
-    <a href="/api/v1/app/download-apk" class="btn btn-primary" style="font-weight: 800; padding: 12px 24px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-      <span>Download APK (v1.1.0)</span>
-    </a>
-  </div>
-</div>
-
-<!-- Free Trakt Data Export Importer -->
-<div class="card" style="border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.05); margin-bottom: 28px;">
-  <div style="display: flex; gap: 16px; align-items: flex-start;">
-    <div style="font-size: 1.8rem; background: rgba(56, 189, 248, 0.12); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: 1px solid rgba(56, 189, 248, 0.3);">
-      📦
-    </div>
-    <div style="flex-grow: 1;">
-      <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--accent-cyan); margin-bottom: 4px;">
-        100% Free Trakt Data Import (No VIP / No API Keys Required)
-      </h3>
-      <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px;">
-        Upload your Trakt GDPR / Account export ZIP archive to immediately import all your watched history, movies, show episodes, ratings, and watchlists.
-      </p>
-
-      <form method="POST" action="/settings/import-export" enctype="multipart/form-data" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
-        <input type="file" name="export_file" accept=".zip" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(0, 0, 0, 0.4); padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);" />
-        <button type="submit" class="btn btn-primary" style="font-weight: 800;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <span>Import ZIP Archive</span>
-        </button>
-      </form>
-    </div>
-  </div>
-</div>
-
-<div class="grid grid-cols-2">
-  <!-- System State Doctor -->
-  <div class="card">
-    <h2 class="card-title" style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-      System State Doctor
-    </h2>
-    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.88rem;">
-      <div style="display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);">
-        <span style="color: var(--text-secondary);">Local SQLite Database</span>
-        <strong style="color: var(--success);">Connected & Healthy</strong>
-      </div>
-      <div style="display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);">
-        <span style="color: var(--text-secondary);">Trakt Account Sync</span>
-        <strong style="color: var(--text-primary);">{{ account.username if account else 'Not Connected' }}</strong>
-      </div>
-      <div style="display: flex; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle);">
-        <span style="color: var(--text-secondary);">Trakt API Access Mode</span>
-        <strong style="color: var(--accent-cyan);">Strictly Read-Only (Local Modifications)</strong>
-      </div>
-      <div style="display: flex; justify-content: space-between;">
-        <span style="color: var(--text-secondary);">Last Successful Sync</span>
-        <span style="font-family: var(--font-mono); color: var(--text-muted);">
-          {{ account.last_successful_sync_at.strftime('%Y-%m-%d %H:%M:%S') if account and account.last_successful_sync_at else 'Never' }}
-        </span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sync Actions Card -->
-  <div class="card">
-    <h2 class="card-title" style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-purple)" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-      Sync Engine Triggers
-    </h2>
-    <div style="display: flex; flex-direction: column; gap: 12px;">
-      <button class="btn btn-secondary" onclick="triggerSync('incremental')">
-        <span>⚡ 15-Minute Incremental Sync</span>
-      </button>
-      <button class="btn btn-secondary" onclick="triggerSync('full')">
-        <span>🔄 7-Day Full Reconciliation Sync</span>
-      </button>
-    </div>
-  </div>
-</div>
-
+</section>
 {% endblock %}

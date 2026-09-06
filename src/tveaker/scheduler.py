@@ -2,6 +2,7 @@
 
 import logging
 import threading
+from collections.abc import Callable
 from datetime import datetime
 
 from tveaker.clock import Clock, SystemClock
@@ -19,16 +20,21 @@ class SyncScheduler:
         clock: Clock | None = None,
         incremental_interval_seconds: int = 900,  # 15 minutes
         full_reconcile_interval_seconds: int = 604800,  # 7 days
+        metadata_hydrator: Callable[[], object] | None = None,
+        metadata_refresh_interval_seconds: int = 86400,
     ) -> None:
         self.account_sync = account_sync
         self.clock = clock or SystemClock()
         self.incremental_interval = incremental_interval_seconds
         self.full_reconcile_interval = full_reconcile_interval_seconds
+        self.metadata_hydrator = metadata_hydrator
+        self.metadata_refresh_interval = metadata_refresh_interval_seconds
 
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_incremental_run: datetime | None = None
         self._last_full_run: datetime | None = None
+        self._last_metadata_run: datetime | None = None
 
     def start(self) -> None:
         """Start scheduler in a daemon background thread."""
@@ -69,6 +75,7 @@ class SyncScheduler:
                 self.account_sync.run("full")
                 self._last_full_run = now
                 self._last_incremental_run = now
+                self._run_metadata_if_due(now)
                 return
             except Exception as e:
                 logger.error("Scheduled full reconciliation failed: %s", e)
@@ -84,6 +91,23 @@ class SyncScheduler:
                 self._last_incremental_run = now
             except Exception as e:
                 logger.error("Scheduled incremental sync failed: %s", e)
+
+        self._run_metadata_if_due(now)
+
+    def _run_metadata_if_due(self, now: datetime) -> None:
+        if self.metadata_hydrator is None:
+            return
+        if (
+            self._last_metadata_run is not None
+            and (now - self._last_metadata_run).total_seconds() < self.metadata_refresh_interval
+        ):
+            return
+        try:
+            logger.info("Executing scheduled metadata enrichment...")
+            self.metadata_hydrator()
+            self._last_metadata_run = now
+        except Exception as exc:
+            logger.warning("Scheduled metadata enrichment failed: %s", exc)
 
     def _run_loop(self) -> None:
         while not self._stop_event.is_set():

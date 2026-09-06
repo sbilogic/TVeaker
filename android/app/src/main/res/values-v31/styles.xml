@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TVeaker.Launch" parent="Theme.TVeaker">
+        <item name="android:windowSplashScreenBackground">@color/tveaker_splash_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_tveaker_mark</item>
+    </style>
+</resources>

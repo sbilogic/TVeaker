@@ -1,0 +1,18 @@
+.git
+.venv
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.coverage
+android
+design-qa
+design-qa.md
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.enc
+data/backup*
+tests
+exports from trakt
+.agents
+.playwright-cli

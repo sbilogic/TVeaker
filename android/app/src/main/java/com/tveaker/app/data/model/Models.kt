@@ -21,8 +21,10 @@ data class ShowEstimateDto(
     val year: Int?,
     val status: String,
     @Json(name = "status_source") val statusSource: String,
+    @Json(name = "include_specials") val includeSpecials: Boolean = false,
     @Json(name = "total_episodes") val totalEpisodes: Int,
     @Json(name = "aired_episodes") val airedEpisodes: Int,
+    @Json(name = "unaired_episodes") val unairedEpisodes: Int = 0,
     @Json(name = "watched_episodes") val watchedEpisodes: Int,
     @Json(name = "remaining_episodes") val remainingEpisodes: Int,
     @Json(name = "unwatched_minutes") val unwatchedMinutes: Int,
@@ -60,10 +62,24 @@ data class UnwatchedEpisodesResponseDto(
     @Json(name = "backdrop_url") val backdropUrl: String?,
     val genres: List<String> = emptyList(),
     @Json(name = "total_episodes") val totalEpisodes: Int,
+    @Json(name = "aired_episodes") val airedEpisodes: Int = totalEpisodes,
+    @Json(name = "unaired_episodes") val unairedEpisodes: Int = 0,
     @Json(name = "watched_episodes") val watchedEpisodes: Int,
     @Json(name = "remaining_episodes") val remainingEpisodes: Int,
     @Json(name = "unwatched_minutes") val unwatchedMinutes: Int,
+    @Json(name = "next_air_date") val nextAirDate: String? = null,
     @Json(name = "unwatched_episodes") val unwatchedEpisodes: List<UnwatchedEpisodeDto> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class NowWatchingDto(
+    @Json(name = "show_id") val showId: Int,
+    @Json(name = "show_title") val showTitle: String,
+    @Json(name = "episode_id") val episodeId: Int,
+    @Json(name = "season_number") val seasonNumber: Int,
+    @Json(name = "episode_number") val episodeNumber: Int,
+    @Json(name = "episode_title") val episodeTitle: String?,
+    @Json(name = "runtime_minutes") val runtimeMinutes: Int?
 )
 
 @JsonClass(generateAdapter = true)
@@ -120,6 +136,11 @@ data class UpdateShowRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class NowWatchingSelectionRequest(
+    @Json(name = "episode_id") val episodeId: Int
+)
+
+@JsonClass(generateAdapter = true)
 data class FeedbackRequest(
     @Json(name = "run_id") val runId: Int,
     @Json(name = "candidate_id") val candidateId: String,
@@ -136,4 +157,10 @@ data class SyncReportDto(
     val status: String,
     val fetched: Map<String, Int>? = null,
     val duration_ms: Float? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class MetadataHydrationDto(
+    val status: String,
+    val limit: Int
 )

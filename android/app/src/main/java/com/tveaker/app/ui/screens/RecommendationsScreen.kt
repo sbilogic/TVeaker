@@ -1,285 +1,180 @@
 package com.tveaker.app.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.tveaker.app.data.model.RecommendationItemDto
-import com.tveaker.app.ui.theme.*
+import com.tveaker.app.ui.theme.BorderSubtle
+import com.tveaker.app.ui.theme.LocalCompactMode
+import com.tveaker.app.ui.theme.StripeIris
+import com.tveaker.app.ui.theme.StripeViolet
+import com.tveaker.app.ui.theme.TextMuted
+import com.tveaker.app.ui.theme.TextPrimary
+import com.tveaker.app.ui.theme.TextSecondary
 import com.tveaker.app.ui.viewmodel.RecommendationsViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecommendationsScreen(viewModel: RecommendationsViewModel) {
     val state by viewModel.uiState.collectAsState()
-    val budgets = listOf(
-        "Any" to null,
-        "30m" to 30,
-        "45m" to 45,
-        "60m" to 60,
-        "90m" to 90,
-        "120m" to 120
-    )
+    val compact = LocalCompactMode.current
+    val budgets = listOf("Any" to null, "30m" to 30, "45m" to 45, "60m" to 60, "90m" to 90, "120m" to 120)
+    val intents = listOf("auto" to "Balanced", "finish_show" to "Finish a show", "start_new" to "Start fresh", "movie" to "Movies", "show" to "Series")
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(StripeIris),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(18.dp))
-                        }
-                        Column {
-                            Text("What to Watch", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
-                            Text("Deterministic Taste Recommender", fontSize = 11.sp, color = TextMuted)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BgBase,
-                    titleContentColor = TextPrimary
-                )
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = if (compact) 4.dp else 10.dp, bottom = if (compact) 16.dp else 24.dp),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 9.dp)
+    ) {
+        item {
+            EditorialPageHeader(
+                index = "03",
+                title = "DISCOVER",
+                subtitle = "A considered next watch, chosen from your taste and the time you actually have."
             )
-        },
-        containerColor = BgBase
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-        ) {
-            // Time Budget Filter Bar
-            Text("TIME BUDGET", color = StripeCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(vertical = 6.dp)
-            ) {
-                items(budgets) { (label, budgetVal) ->
-                    val isSelected = state.selectedBudget == budgetVal
-                    Surface(
-                        color = if (isSelected) StripeIris else BgSurface,
-                        shape = RoundedCornerShape(8.dp),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            if (isSelected) StripeCyan else BorderSubtle
-                        ),
-                        modifier = Modifier.clickable { viewModel.setBudget(budgetVal) }
-                    ) {
-                        Text(
-                            text = label,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) TextPrimary else TextSecondary,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                    }
+        }
+        if (state.isOffline) {
+            item {
+                EditorialOfflineBanner(
+                    modifier = Modifier.padding(bottom = if (compact) 4.dp else 8.dp)
+                )
+            }
+        }
+        item {
+            EditorialSectionLabel("TIME BUDGET")
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 8.dp), modifier = Modifier.padding(top = if (compact) 5.dp else 9.dp)) {
+                items(budgets) { (label, budget) ->
+                    EditorialFilterChip(label, state.selectedBudget == budget) { viewModel.setBudget(budget) }
                 }
             }
-
-            if (state.isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = StripeIris)
+        }
+        item {
+            EditorialSectionLabel("VIEWING INTENT")
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 8.dp), modifier = Modifier.padding(top = if (compact) 5.dp else 9.dp)) {
+                items(intents) { (value, label) ->
+                    EditorialFilterChip(label, state.selectedIntent == value) { viewModel.setIntent(value) }
                 }
-            } else if (state.items.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No recommendations match this filter criteria.", color = TextSecondary)
+            }
+        }
+        item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
+        if (state.isLoading && state.items.isEmpty()) {
+            item { EditorialInlineLoading("BUILDING YOUR EDIT") }
+        } else if (state.items.isEmpty()) {
+            item {
+                EditorialEmptyMessage(
+                    title = "NOTHING MATCHES\nTHIS EDIT.",
+                    body = state.errorMessage ?: "Try a wider time budget or a different viewing intent."
+                )
+            }
+        } else {
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    EditorialSectionLabel("YOUR NEXT WATCH")
+                    Text("${state.items.size} PICKS", color = TextMuted, fontSize = 9.sp, letterSpacing = 1.sp)
                 }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(state.items) { item ->
-                        CleanRecommendationCard(
-                            item = item,
-                            onAction = { action -> viewModel.submitFeedback(item.candidateId, action) }
-                        )
-                    }
-                    item { Spacer(modifier = Modifier.height(24.dp)) }
-                }
+            }
+            items(state.items, key = { it.candidateId }) { item ->
+                CleanRecommendationCard(item) { action -> viewModel.submitFeedback(item.candidateId, action) }
             }
         }
     }
 }
 
 @Composable
-fun CleanRecommendationCard(
-    item: RecommendationItemDto,
-    onAction: (String) -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = BgSurface,
-        shape = RoundedCornerShape(14.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+fun CleanRecommendationCard(item: RecommendationItemDto, onAction: (String) -> Unit) {
+    val compact = LocalCompactMode.current
+    EditorialPageCard {
+        Column(modifier = Modifier.padding(vertical = if (compact) 6.dp else 9.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 14.dp), verticalAlignment = Alignment.Top) {
                 if (!item.posterUrl.isNullOrEmpty()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(item.posterUrl)
-                            .crossfade(true)
-                            .build(),
+                        model = ImageRequest.Builder(LocalContext.current).data(artworkUrl(item.posterUrl)).crossfade(true).build(),
                         contentDescription = item.title,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(width = 50.dp, height = 74.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                        modifier = Modifier.size(width = if (compact) 50.dp else 58.dp, height = if (compact) 72.dp else 84.dp)
                     )
                 } else {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 50.dp, height = 74.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(StripeIris.copy(alpha = 0.15f))
-                            .border(1.dp, StripeIris.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = item.title.take(1),
-                            fontWeight = FontWeight.Bold,
-                            color = StripeCyan,
-                            fontSize = 18.sp
-                        )
+                    Box(modifier = Modifier.size(width = if (compact) 50.dp else 58.dp, height = if (compact) 72.dp else 84.dp).background(StripeIris.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = StripeIris, modifier = Modifier.size(24.dp))
                     }
                 }
-
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = item.title,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextPrimary,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1
-                        )
-                        IconButton(
-                            onClick = { onAction("not_interested") },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = TextMuted)
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(item.title, color = TextPrimary, fontFamily = EditorialSerif, fontSize = if (compact) 18.sp else 21.sp, lineHeight = if (compact) 20.sp else 23.sp, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        IconButton(onClick = { onAction("not_interested") }, modifier = Modifier.size(48.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = TextMuted, modifier = Modifier.size(17.dp))
                         }
                     }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 2.dp)
-                    ) {
-                        Surface(
-                            color = StripeViolet.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(4.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, StripeViolet.copy(alpha = 0.4f))
-                        ) {
-                            Text(
-                                text = "${(item.score * 100).toInt()}% MATCH",
-                                color = StripeCyan,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (compact) 5.dp else 9.dp)) {
+                        Surface(color = StripeViolet.copy(alpha = .14f), shape = RectangleShape) {
+                            Text("${(item.score * 100).toInt()}% MATCH", color = StripeIris, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp))
                         }
-
-                        Text(
-                            text = "${item.mediaType.uppercase()} • ${item.runtimeMinutes ?: 45}m",
-                            color = TextSecondary,
-                            fontSize = 11.sp
-                        )
+                        Text("${item.mediaType.uppercase()} · ${item.runtimeMinutes ?: 45}M", color = TextMuted, fontSize = 10.sp, letterSpacing = .4.sp)
                     }
                 }
             }
-
-            if (item.overview != null) {
-                Text(
-                    text = item.overview,
-                    color = TextSecondary,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    maxLines = 3,
-                    modifier = Modifier.padding(top = 10.dp)
-                )
+            item.overview?.takeIf { it.isNotBlank() }?.let { overview -> Text(overview, color = TextSecondary, fontFamily = EditorialSerif, fontSize = if (compact) 13.sp else 14.sp, lineHeight = if (compact) 17.sp else 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = if (compact) 6.dp else 9.dp)) }
+            Row(modifier = Modifier.fillMaxWidth().padding(top = if (compact) 6.dp else 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = StripeIris, modifier = Modifier.size(15.dp))
+                Text(item.explanation, color = TextSecondary, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(start = 7.dp).weight(1f))
             }
-
-            Surface(
-                color = BgSurfaceElevated,
-                shape = RoundedCornerShape(8.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp)
-            ) {
-                Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("💡", fontSize = 11.sp)
-                    Text(
-                        text = item.explanation,
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(top = if (compact) 6.dp else 9.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { onAction("accepted") },
-                    colors = ButtonDefaults.buttonColors(containerColor = StripeIris),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    shape = RectangleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = TextPrimary, contentColor = MaterialTheme.colorScheme.background),
+                    contentPadding = PaddingValues(horizontal = 10.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp), tint = TextPrimary)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Watch Now", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("WATCH NOW", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp)
                 }
-                OutlinedButton(
-                    onClick = { onAction("not_now") },
-                    shape = RoundedCornerShape(8.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Text("Later", color = TextSecondary, fontSize = 12.sp)
+                OutlinedButton(onClick = { onAction("not_now") }, modifier = Modifier.heightIn(min = 48.dp), shape = RectangleShape, border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle), contentPadding = PaddingValues(horizontal = 15.dp)) {
+                    Text("LATER", color = TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = .6.sp)
                 }
             }
+            HorizontalDivider(modifier = Modifier.padding(top = if (compact) 6.dp else 9.dp), color = BorderSubtle)
         }
     }
 }

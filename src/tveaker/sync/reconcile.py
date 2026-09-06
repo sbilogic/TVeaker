@@ -129,18 +129,37 @@ def upsert_episode(session: Session, show_id: int, episode: TraktEpisode) -> Epi
     stmt = select(Episode).where(Episode.trakt_id == episode.ids.trakt)
     ep = session.execute(stmt).scalar_one_or_none()
     if ep is None:
-        ep = Episode(
-            show_id=show_id,
-            trakt_id=episode.ids.trakt,
-            season_number=episode.season,
-            episode_number=episode.number,
-            title=episode.title,
-            overview=episode.overview,
-            runtime_minutes=episode.runtime,
-            first_aired=episode.first_aired,
-            remote_updated_at=episode.updated_at,
-        )
-        session.add(ep)
+        legacy = session.execute(
+            select(Episode).where(
+                Episode.show_id == show_id,
+                Episode.season_number == episode.season,
+                Episode.episode_number == episode.number,
+                Episode.trakt_id < 0,
+            )
+        ).scalar_one_or_none()
+        if legacy is not None:
+            # Retain any local watch event attached to an old metadata-only row
+            # when Trakt later supplies the authoritative episode identifier.
+            ep = legacy
+            ep.trakt_id = episode.ids.trakt
+            ep.title = episode.title or ep.title
+            ep.overview = episode.overview or ep.overview
+            ep.runtime_minutes = episode.runtime or ep.runtime_minutes
+            ep.first_aired = episode.first_aired or ep.first_aired
+            ep.remote_updated_at = episode.updated_at or ep.remote_updated_at
+        else:
+            ep = Episode(
+                show_id=show_id,
+                trakt_id=episode.ids.trakt,
+                season_number=episode.season,
+                episode_number=episode.number,
+                title=episode.title,
+                overview=episode.overview,
+                runtime_minutes=episode.runtime,
+                first_aired=episode.first_aired,
+                remote_updated_at=episode.updated_at,
+            )
+            session.add(ep)
     else:
         ep.title = episode.title or ep.title
         ep.overview = episode.overview or ep.overview

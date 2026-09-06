@@ -63,6 +63,10 @@ android/local.properties
 *.swp
 *.swo
 
-# OS
-.DS_Store
-Thumbs.db
+# Agent & Test Logs
+.agents/
+.playwright-cli/
+ORIGINAL_REQUEST.md
+data/*.enc
+data/backup*
+

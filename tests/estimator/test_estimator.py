@@ -205,9 +205,13 @@ def test_estimate_with_specials_and_future_airing(estimator_env):
 
     est_no_specials = estimator.estimate_show(3)
     assert est_no_specials is not None
+    assert est_no_specials.include_specials is False
     # Season 1 has 4 episodes (3 aired, 1 future)
     assert est_no_specials.total_episodes == 4
     assert est_no_specials.aired_episodes == 3
+    assert est_no_specials.unaired_episodes == 1
+    assert est_no_specials.remaining_episodes == 3
+    assert est_no_specials.unwatched_minutes == 3 * 50
     assert est_no_specials.next_air_date == now + timedelta(days=7)
 
     # Enable specials
@@ -218,8 +222,289 @@ def test_estimate_with_specials_and_future_airing(estimator_env):
 
     est_with_specials = estimator.estimate_show(3)
     assert est_with_specials is not None
+    assert est_with_specials.include_specials is True
     # 4 season 1 episodes + 1 season 0 special = 5
     assert est_with_specials.total_episodes == 5
+    assert est_with_specials.aired_episodes == 4
+    assert est_with_specials.remaining_episodes == 4
+
+
+def test_unknown_air_dates_are_not_to_watch_and_show_runtime_is_the_fallback(estimator_env):
+    estimator, engine, now = estimator_env
+
+    with get_db_session(engine) as session:
+        show = MediaItem(
+            id=4,
+            media_type="show",
+            trakt_id=104,
+            title="Release Date Test",
+            runtime_minutes=44,
+        )
+        session.add(show)
+        session.add_all(
+            [
+                Episode(
+                    id=401,
+                    show_id=4,
+                    trakt_id=4001,
+                    season_number=1,
+                    episode_number=1,
+                    title="Aired, runtime missing",
+                    runtime_minutes=None,
+                    first_aired=now - timedelta(days=1),
+                ),
+                Episode(
+                    id=402,
+                    show_id=4,
+                    trakt_id=4002,
+                    season_number=1,
+                    episode_number=2,
+                    title="Future",
+                    runtime_minutes=51,
+                    first_aired=now + timedelta(days=7),
+                ),
+                Episode(
+                    id=403,
+                    show_id=4,
+                    trakt_id=4003,
+                    season_number=1,
+                    episode_number=3,
+                    title="Schedule unknown",
+                    runtime_minutes=55,
+                    first_aired=None,
+                ),
+            ]
+        )
+        session.add(
+            TrackedShow(
+                account_id=1,
+                show_id=4,
+                status="watching",
+                status_source="auto",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
+    estimate = estimator.estimate_show(4)
+
+    assert estimate is not None
+    assert estimate.total_episodes == 3
+    assert estimate.aired_episodes == 1
+    assert estimate.unaired_episodes == 2
+    assert estimate.remaining_episodes == 1
+    assert estimate.unwatched_minutes == 44
+    assert estimate.avg_runtime_minutes == 44
+    assert estimate.next_air_date == now + timedelta(days=7)
+
+
+def test_watched_episode_without_an_air_date_is_evidence_that_it_has_aired(estimator_env):
+    """Imported Trakt history must never disappear just because catalog metadata is incomplete."""
+    estimator, engine, now = estimator_env
+
+    with get_db_session(engine) as session:
+        show = MediaItem(id=5, media_type="show", trakt_id=105, title="History Is Evidence")
+        session.add(show)
+        session.add_all(
+            [
+                Episode(
+                    id=501,
+                    show_id=5,
+                    trakt_id=5001,
+                    season_number=1,
+                    episode_number=1,
+                    title="Known release",
+                    runtime_minutes=30,
+                    first_aired=now - timedelta(days=1),
+                ),
+                Episode(
+                    id=502,
+                    show_id=5,
+                    trakt_id=5002,
+                    season_number=1,
+                    episode_number=2,
+                    title="Imported history, date missing",
+                    runtime_minutes=30,
+                    first_aired=None,
+                ),
+                Episode(
+                    id=503,
+                    show_id=5,
+                    trakt_id=5003,
+                    season_number=1,
+                    episode_number=3,
+                    title="Future",
+                    runtime_minutes=30,
+                    first_aired=now + timedelta(days=7),
+                ),
+            ]
+        )
+        session.add_all(
+            [
+                WatchEvent(
+                    history_id=50001,
+                    account_id=1,
+                    watched_at=now,
+                    action="watch",
+                    episode_id=502,
+                ),
+                TrackedShow(
+                    account_id=1,
+                    show_id=5,
+                    status="watching",
+                    status_source="auto",
+                    created_at=now,
+                    updated_at=now,
+                ),
+            ]
+        )
+
+    estimate = estimator.estimate_show(5)
+
+    assert estimate is not None
+    assert estimate.total_episodes == 3
+    assert estimate.aired_episodes == 2
+    assert estimate.unaired_episodes == 1
+    assert estimate.watched_episodes == 1
+    assert estimate.remaining_episodes == 1
+    assert estimate.completion_percent == 50.0
+
+
+def test_synthetic_metadata_episodes_do_not_create_false_remaining_work(estimator_env):
+    """TVMaze enrichment must not turn unverified provider rows into a viewing backlog."""
+    estimator, engine, now = estimator_env
+
+    with get_db_session(engine) as session:
+        show = MediaItem(id=6, media_type="show", trakt_id=106, title="Authoritative Catalog")
+        session.add(show)
+        session.add_all(
+            [
+                Episode(
+                    id=601,
+                    show_id=6,
+                    trakt_id=6001,
+                    season_number=1,
+                    episode_number=1,
+                    title="Imported watch",
+                    runtime_minutes=30,
+                    first_aired=None,
+                ),
+                Episode(
+                    id=602,
+                    show_id=6,
+                    trakt_id=-6002,
+                    season_number=2,
+                    episode_number=1,
+                    title="Hydrated-only episode",
+                    runtime_minutes=30,
+                    first_aired=now - timedelta(days=1),
+                ),
+            ]
+        )
+        session.add_all(
+            [
+                WatchEvent(
+                    history_id=60001,
+                    account_id=1,
+                    watched_at=now,
+                    action="watch",
+                    episode_id=601,
+                ),
+                TrackedShow(
+                    account_id=1,
+                    show_id=6,
+                    status="watching",
+                    status_source="auto",
+                    created_at=now,
+                    updated_at=now,
+                ),
+            ]
+        )
+
+    estimate = estimator.estimate_show(6)
+
+    assert estimate is not None
+    assert estimate.total_episodes == 1
+    assert estimate.watched_episodes == 1
+    assert estimate.remaining_episodes == 0
+    assert estimate.is_caught_up is True
+
+
+def test_trakt_aired_snapshot_caps_provider_candidates_without_hiding_real_remaining_work(
+    estimator_env,
+):
+    """Provider rows may fill a Trakt-confirmed gap, never expand beyond it."""
+    estimator, engine, now = estimator_env
+
+    with get_db_session(engine) as session:
+        session.add(
+            MediaItem(
+                id=7,
+                media_type="show",
+                trakt_id=107,
+                title="Snapshot-backed Show",
+                trakt_aired_episodes=2,
+                runtime_minutes=30,
+            )
+        )
+        session.add_all(
+            [
+                Episode(
+                    id=701,
+                    show_id=7,
+                    trakt_id=7001,
+                    season_number=1,
+                    episode_number=1,
+                    title="Imported watch",
+                    runtime_minutes=30,
+                    first_aired=now - timedelta(days=2),
+                ),
+                Episode(
+                    id=702,
+                    show_id=7,
+                    trakt_id=-7002,
+                    season_number=1,
+                    episode_number=2,
+                    title="Confirmed-gap candidate",
+                    runtime_minutes=30,
+                    first_aired=now - timedelta(days=1),
+                ),
+                Episode(
+                    id=703,
+                    show_id=7,
+                    trakt_id=-7003,
+                    season_number=2,
+                    episode_number=1,
+                    title="Provider future overreach",
+                    runtime_minutes=30,
+                    first_aired=now - timedelta(days=1),
+                ),
+                WatchEvent(
+                    history_id=70001,
+                    account_id=1,
+                    watched_at=now,
+                    action="watch",
+                    episode_id=701,
+                ),
+                TrackedShow(
+                    account_id=1,
+                    show_id=7,
+                    status="watching",
+                    status_source="auto",
+                    created_at=now,
+                    updated_at=now,
+                ),
+            ]
+        )
+
+    estimate = estimator.estimate_show(7)
+
+    assert estimate is not None
+    assert estimate.total_episodes == 2
+    assert estimate.aired_episodes == 2
+    assert estimate.watched_episodes == 1
+    assert estimate.remaining_episodes == 1
+    assert estimate.unwatched_minutes == 30
 
 
 def test_estimate_all(estimator_env):

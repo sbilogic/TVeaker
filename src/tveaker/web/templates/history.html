@@ -1,70 +1,10 @@
 {% extends "base.html" %}
-
-{% block title %}Watch History{% endblock %}
-
+{% block title %}History{% endblock %}
 {% block content %}
-<div class="header-bar">
-  <div>
-    <h1 class="page-title">Watch History</h1>
-    <p class="page-subtitle">Chronological timeline of all scrobbled movies and show episodes ({{ history | length }} events loaded)</p>
-  </div>
-  <div class="search-container" style="margin-bottom: 0; min-width: 300px;">
-    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="11" cy="11" r="8"></circle>
-      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-    </svg>
-    <input type="text" id="history-search-input" class="search-input" placeholder="Search watch history (press '/' to focus)..." />
-  </div>
-</div>
-
-<div class="table-container">
-  <table>
-    <thead>
-      <tr>
-        <th>Watched Date & Time</th>
-        <th>Type</th>
-        <th>Title</th>
-        <th>Episode Details</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in history %}
-      <tr class="history-row">
-        <td style="color: var(--text-secondary); font-size: 0.82rem; font-family: var(--font-mono); white-space: nowrap;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-cyan);"></div>
-            <span>{{ item.watched_at.strftime('%b %d, %Y • %H:%M') if item.watched_at else '—' }}</span>
-          </div>
-        </td>
-        <td>
-          <span class="badge {% if item.media_type == 'movie' %}badge-purple{% else %}badge-accent{% endif %}">
-            {{ item.media_type }}
-          </span>
-        </td>
-        <td style="font-weight: 700; color: #fff;">
-          {{ item.title }}
-        </td>
-        <td style="color: var(--text-secondary); font-size: 0.84rem;">
-          {% if item.media_type == 'episode' %}
-            <span style="font-family: var(--font-mono); color: var(--accent-cyan); font-weight: 700; background: rgba(56, 189, 248, 0.1); padding: 2px 6px; border-radius: 4px;">S{{ '%02d' % item.season_number }}E{{ '%02d' % item.episode_number }}</span>
-            <span style="margin-left: 8px; color: var(--text-primary);">{{ item.episode_title }}</span>
-          {% else %}
-            <span style="color: var(--text-muted);">Feature Film</span>
-          {% endif %}
-        </td>
-        <td>
-          <span style="font-size: 0.76rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">{{ item.action }}</span>
-        </td>
-      </tr>
-      {% else %}
-      <tr>
-        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 48px;">
-          No watch history recorded yet.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+<section class="archive-page history-page">
+  <span class="sr-only">Watch History</span>
+  <header class="archive-header"><div><p class="section-index">04 / WATCHED ARCHIVE</p><h1>HISTORY</h1></div><div class="archive-header-note"><strong>{{ history|length }}</strong><span>recent events</span></div></header>
+  <div class="archive-tools history-tools"><p>Your viewing, newest first.</p><label class="archive-search"><span class="material-symbols-rounded">search</span><input id="history-search-input" type="search" placeholder="Find a watch" autocomplete="off"></label></div>
+  <div class="history-ledger"><div class="history-ledger-head"><span>When</span><span>Title</span><span>Episode</span><span>Type</span></div>{% for item in history %}<article class="history-row"><time>{{ item.watched_at.strftime('%d %b %Y') if item.watched_at else '—' }}<small>{{ item.watched_at.strftime('%H:%M') if item.watched_at else '' }}</small></time><div><strong>{{ item.title }}</strong>{% if item.media_type == 'episode' %}<small>{{ item.episode_title or 'Untitled episode' }}</small>{% endif %}</div><span class="history-episode">{% if item.media_type == 'episode' %}S{{ '%02d'|format(item.season_number) }} E{{ '%02d'|format(item.episode_number) }}{% else %}Feature film{% endif %}</span><span class="history-type">{{ item.media_type }}</span></article>{% else %}<div class="editorial-empty"><p class="section-index">EMPTY ARCHIVE</p><h2>NOTHING<br>WATCHED.</h2></div>{% endfor %}</div>
+</section>
 {% endblock %}

@@ -1,7 +1,7 @@
 """Tests for HTML UI views rendered by FastAPI and Jinja2."""
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine
@@ -12,7 +12,7 @@ from tveaker.auth.token_store import MemoryTokenStore, TokenData
 from tveaker.clock import FrozenClock
 from tveaker.config import Settings
 from tveaker.db import Base, _configure_sqlite_connection, get_db_session
-from tveaker.models import Account, MediaItem, TrackedShow
+from tveaker.models import Account, Episode, MediaItem, TrackedShow
 from tveaker.web.app import create_app
 
 
@@ -50,6 +50,17 @@ def view_client():
             genres_json=json.dumps(["drama", "crime"]),
         )
         session.add(show1)
+        session.add(
+            Episode(
+                id=11,
+                show_id=1,
+                trakt_id=1001,
+                season_number=1,
+                episode_number=1,
+                title="Pilot",
+                first_aired=now - timedelta(days=1),
+            )
+        )
         session.flush()
 
         ts1 = TrackedShow(
@@ -80,7 +91,7 @@ def view_client():
 def test_view_dashboard(view_client):
     res = view_client.get("/")
     assert res.status_code == 200
-    assert "Watching Dashboard" in res.text
+    assert "TONIGHT" in res.text
     assert "Better Call Saul" in res.text
 
 
@@ -89,6 +100,7 @@ def test_view_shows(view_client):
     assert res.status_code == 200
     assert "Tracked Shows" in res.text
     assert "Better Call Saul" in res.text
+    assert "Specials: off" in res.text
 
 
 def test_view_recommendations(view_client):
@@ -106,7 +118,7 @@ def test_view_history(view_client):
 def test_view_settings(view_client):
     res = view_client.get("/settings")
     assert res.status_code == 200
-    assert "Settings & System Doctor" in res.text
+    assert "CONTROL ROOM" in res.text
     assert "sahil" in res.text
 
 

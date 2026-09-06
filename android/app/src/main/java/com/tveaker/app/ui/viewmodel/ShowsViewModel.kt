@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 data class ShowsUiState(
@@ -20,7 +21,8 @@ data class ShowsUiState(
     val errorMessage: String? = null,
     val selectedShowUnwatched: UnwatchedEpisodesResponseDto? = null,
     val isEpisodesLoading: Boolean = false,
-    val currentServerUrl: String = ""
+    val currentServerUrl: String = "",
+    val isOffline: Boolean = false
 )
 
 class ShowsViewModel(
@@ -28,14 +30,22 @@ class ShowsViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
-        ShowsUiState(currentServerUrl = repository.currentBaseUrl.value)
+        ShowsUiState(
+            currentServerUrl = repository.currentBaseUrl.value,
+            isOffline = repository.isOffline.value
+        )
     )
     val uiState: StateFlow<ShowsUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            repository.isOffline.collectLatest { isOffline ->
+                _uiState.value = _uiState.value.copy(isOffline = isOffline)
+            }
+        }
         loadShows()
         viewModelScope.launch {
-            repository.currentBaseUrl.collectLatest { newUrl ->
+            repository.currentBaseUrl.drop(1).collectLatest { newUrl ->
                 _uiState.value = _uiState.value.copy(currentServerUrl = newUrl)
                 loadShows()
             }
@@ -59,12 +69,14 @@ class ShowsViewModel(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     shows = result.getOrNull() ?: emptyList(),
-                    errorMessage = null
+                    errorMessage = null,
+                    isOffline = repository.isOffline.value
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to connect to ${repository.currentBaseUrl.value}"
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to connect to ${repository.currentBaseUrl.value}",
+                    isOffline = repository.isOffline.value
                 )
             }
         }
@@ -77,12 +89,14 @@ class ShowsViewModel(
             if (result.isSuccess) {
                 _uiState.value = _uiState.value.copy(
                     isEpisodesLoading = false,
-                    selectedShowUnwatched = result.getOrNull()
+                    selectedShowUnwatched = result.getOrNull(),
+                    isOffline = repository.isOffline.value
                 )
             } else {
                 _uiState.value = _uiState.value.copy(
                     isEpisodesLoading = false,
-                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to load episodes"
+                    errorMessage = result.exceptionOrNull()?.message ?: "Failed to load episodes",
+                    isOffline = repository.isOffline.value
                 )
             }
         }
@@ -97,6 +111,20 @@ class ShowsViewModel(
             repository.watchEpisode(showId, episodeId)
             loadUnwatchedEpisodes(showId)
             loadShows()
+        }
+    }
+
+    fun selectNowWatching(episodeId: Int) {
+        viewModelScope.launch {
+            val result = repository.selectNowWatching(episodeId)
+            if (result.isSuccess) {
+                _uiState.value = _uiState.value.copy(selectedShowUnwatched = null, errorMessage = null)
+                loadShows()
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = result.exceptionOrNull()?.message ?: "Could not choose this episode"
+                )
+            }
         }
     }
 

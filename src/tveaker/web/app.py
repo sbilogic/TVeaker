@@ -7,11 +7,11 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine
 from starlette.middleware.sessions import SessionMiddleware
 
-from tveaker.auth.token_store import KeyringTokenStore, TokenStore
+from tveaker.auth.token_store import TokenStore, create_token_store
 from tveaker.auth.trakt_oauth import TraktOAuth
 from tveaker.clock import Clock, SystemClock
 from tveaker.config import Settings, get_settings
-from tveaker.db import create_db_engine
+from tveaker.db import create_db_engine, init_db
 from tveaker.sync.importer import AccountSync
 from tveaker.trakt.client import TraktClient
 from tveaker.web.routes import api_router, ui_router
@@ -26,8 +26,9 @@ def create_app(
     """Create and configure the TVeaker FastAPI application."""
     app_settings = settings or get_settings()
     app_engine = db_engine or create_db_engine(app_settings.database_url)
+    init_db(app_engine)
     app_clock = clock or SystemClock()
-    app_token_store = token_store or KeyringTokenStore()
+    app_token_store = token_store or create_token_store(secret_key=app_settings.secret_key)
 
     app_oauth = TraktOAuth(settings=app_settings, token_store=app_token_store)
     app_client = TraktClient(settings=app_settings, token_store=app_token_store, oauth=app_oauth)
@@ -58,11 +59,6 @@ def create_app(
     app.state.trakt_oauth = app_oauth
     app.state.trakt_client = app_client
     app.state.account_sync = app_sync
-
-    # Trigger background metadata & poster hydration thread
-    from tveaker.metadata import start_background_metadata_hydration
-
-    start_background_metadata_hydration(app_engine)
 
     # Include routers
     app.include_router(ui_router)

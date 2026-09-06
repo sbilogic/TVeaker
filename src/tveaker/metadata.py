@@ -2,16 +2,99 @@
 
 import logging
 import threading
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, cast
 
 import httpx
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, delete, or_, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
+from tveaker.config import Settings, get_settings
 from tveaker.db import get_db_session
-from tveaker.models import Episode, MediaItem
+from tveaker.episode_catalog import get_show_progress_catalog
+from tveaker.models import Episode, MediaItem, NowWatching, PlaybackState, WatchEvent
 
 logger = logging.getLogger(__name__)
+
+TMDB_API_BASE_URL = "https://api.themoviedb.org/3"
+TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/original"
+
+
+class TMDBMetadataService:
+    """Optional TMDB resolver for richer movie and series metadata."""
+
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        http_client: httpx.Client | None = None,
+    ) -> None:
+        self.settings = settings or get_settings()
+        self.client = http_client or httpx.Client(timeout=8.0, follow_redirects=True)
+
+    @property
+    def is_configured(self) -> bool:
+        return self.settings.is_tmdb_configured
+
+    def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        if not self.is_configured:
+            return None
+        query = dict(params or {})
+        headers = {"accept": "application/json"}
+        if self.settings.tmdb_access_token:
+            headers["Authorization"] = f"Bearer {self.settings.tmdb_access_token}"
+        else:
+            query["api_key"] = self.settings.tmdb_api_key
+        try:
+            response = self.client.get(f"{TMDB_API_BASE_URL}{path}", params=query, headers=headers)
+            if response.status_code == 200:
+                return response.json()
+        except httpx.HTTPError as exc:
+            logger.debug("TMDB request %s failed: %s", path, exc)
+        return None
+
+    def fetch_media_data(self, media: MediaItem) -> dict[str, Any] | None:
+        """Resolve a title to TMDB details without persisting remote IDs."""
+        resource = "tv" if media.media_type == "show" else "movie"
+        params: dict[str, Any] = {
+            "query": media.title,
+            "include_adult": "false",
+            "language": "en-US",
+        }
+        if media.year:
+            params["first_air_date_year" if resource == "tv" else "year"] = media.year
+        search = self._get(f"/search/{resource}", params)
+        results = (search or {}).get("results") or []
+        if not results:
+            return None
+        title_key = "name" if resource == "tv" else "title"
+        exact = next(
+            (
+                item
+                for item in results
+                if str(item.get(title_key, "")).casefold() == media.title.casefold()
+            ),
+            None,
+        )
+        candidate = exact or results[0]
+        remote_id = candidate.get("id")
+        if not remote_id:
+            return None
+        return self._get(f"/{resource}/{remote_id}", {"language": "en-US"})
+
+
+def _parse_air_datetime(raw_episode: dict[str, Any]) -> datetime | None:
+    """Parse TVMaze's precise airstamp, falling back to its calendar air date."""
+    raw_value = raw_episode.get("airstamp") or raw_episode.get("airdate")
+    if not raw_value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(raw_value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 # Curated fallback poster & backdrop URLs for popular series & movies
 CURATED_ARTWORK: dict[str, dict[str, str]] = {
@@ -85,8 +168,13 @@ CURATED_ARTWORK: dict[str, dict[str, str]] = {
 class MetadataHydrationService:
     """Hydrates real episode titles, runtimes, overviews, and poster artwork."""
 
-    def __init__(self, http_client: httpx.Client | None = None) -> None:
+    def __init__(
+        self,
+        http_client: httpx.Client | None = None,
+        tmdb_service: TMDBMetadataService | None = None,
+    ) -> None:
         self.client = http_client or httpx.Client(timeout=6.0, follow_redirects=True)
+        self.tmdb = tmdb_service or TMDBMetadataService()
 
     def fetch_show_data_from_tvmaze(
         self, title: str, imdb_id: str | None = None
@@ -152,7 +240,7 @@ class MetadataHydrationService:
         return {}
 
     def hydrate_item(self, session: Session, media: MediaItem) -> tuple[bool, int]:
-        """Hydrate poster art and real episode names for a single MediaItem.
+        """Hydrate poster art and existing Trakt episode metadata for one MediaItem.
 
         Returns: (poster_updated: bool, episodes_updated_count: int)
         """
@@ -161,14 +249,43 @@ class MetadataHydrationService:
 
         t_clean = media.title.lower().strip()
 
-        # 1. Curated Artwork Check
+        # 1. Use TMDB whenever the owner has configured it. It is stronger for
+        # movies and media-level artwork/runtime; TVMaze remains the schedule
+        # authority for episode-level air dates and runtimes.
+        tmdb_data = self.tmdb.fetch_media_data(media)
+        if tmdb_data:
+            poster_path = tmdb_data.get("poster_path")
+            backdrop_path = tmdb_data.get("backdrop_path")
+            if not media.poster_url and poster_path:
+                media.poster_url = f"{TMDB_IMAGE_BASE_URL}{poster_path}"
+                poster_updated = True
+            if not media.backdrop_url and backdrop_path:
+                media.backdrop_url = f"{TMDB_IMAGE_BASE_URL}{backdrop_path}"
+            runtime = tmdb_data.get("runtime")
+            if not runtime:
+                runtimes = tmdb_data.get("episode_run_time") or []
+                runtime = next(
+                    (value for value in runtimes if isinstance(value, int) and value > 0),
+                    None,
+                )
+            if not media.runtime_minutes and isinstance(runtime, int) and runtime > 0:
+                media.runtime_minutes = runtime
+            release_date = tmdb_data.get("first_air_date") or tmdb_data.get("release_date")
+            if media.first_aired is None and release_date:
+                media.first_aired = _parse_air_datetime({"airdate": release_date})
+            if not media.genres and tmdb_data.get("genres"):
+                media.genres = [genre["name"] for genre in tmdb_data["genres"] if genre.get("name")]
+            if not media.status and tmdb_data.get("status"):
+                media.status = str(tmdb_data["status"])
+
+        # 2. Curated artwork remains an offline-safe fallback.
         if not media.poster_url and t_clean in CURATED_ARTWORK:
             art = CURATED_ARTWORK[t_clean]
             media.poster_url = art["poster_url"]
             media.backdrop_url = art["backdrop_url"]
             poster_updated = True
 
-        # 2. Movie or Show OMDb Poster Fetch if missing
+        # 3. Movie or show OMDb poster fallback.
         if not media.poster_url and media.imdb_id:
             omdb_poster = self.fetch_poster_from_omdb(media.imdb_id)
             if omdb_poster:
@@ -176,10 +293,19 @@ class MetadataHydrationService:
                 media.backdrop_url = omdb_poster
                 poster_updated = True
 
-        # 3. TVMaze Metadata & Episodes Fetch (for TV shows)
+        # 4. TVMaze is the episode schedule fallback and no-key provider.
         if media.media_type == "show":
             tvmaze_data = self.fetch_show_data_from_tvmaze(media.title, media.imdb_id)
             if tvmaze_data:
+                show_runtime = tvmaze_data.get("averageRuntime") or tvmaze_data.get("runtime")
+                if not media.runtime_minutes and show_runtime:
+                    media.runtime_minutes = int(show_runtime)
+
+                if media.first_aired is None and tvmaze_data.get("premiered"):
+                    media.first_aired = _parse_air_datetime(
+                        {"airdate": tvmaze_data["premiered"]}
+                    )
+
                 img = tvmaze_data.get("image") or {}
                 if not media.poster_url and img.get("medium"):
                     media.poster_url = img.get("medium")
@@ -199,6 +325,7 @@ class MetadataHydrationService:
                         season_num = raw_ep.get("season")
                         ep_num = raw_ep.get("number")
                         ep_name = raw_ep.get("name")
+                        first_aired = _parse_air_datetime(raw_ep)
 
                         if season_num is None or ep_num is None or not ep_name:
                             continue
@@ -217,6 +344,8 @@ class MetadataHydrationService:
                                 episodes_updated += 1
                             if not ep_record.runtime_minutes and raw_ep.get("runtime"):
                                 ep_record.runtime_minutes = raw_ep.get("runtime")
+                            if ep_record.first_aired is None and first_aired is not None:
+                                ep_record.first_aired = first_aired
                             if not ep_record.overview and raw_ep.get("summary"):
                                 clean_summary = (
                                     (raw_ep.get("summary") or "")
@@ -227,26 +356,7 @@ class MetadataHydrationService:
                                     .strip()
                                 )
                                 ep_record.overview = clean_summary
-                        else:
-                            new_ep = Episode(
-                                show_id=media.id,
-                                trakt_id=-(media.id * 1000000 + season_num * 10000 + ep_num),
-                                season_number=season_num,
-                                episode_number=ep_num,
-                                title=ep_name,
-                                runtime_minutes=raw_ep.get("runtime")
-                                or media.runtime_minutes
-                                or 42,
-                                overview=(raw_ep.get("summary") or "")
-                                .replace("<p>", "")
-                                .replace("</p>", "")
-                                .strip(),
-                            )
-                            session.add(new_ep)
-                            existing_ep_map[ep_key] = new_ep
-                            episodes_updated += 1
-
-            # 4. Fallback OMDb Season Search for remaining dummy episode titles
+            # 5. Fallback OMDb Season Search for remaining dummy episode titles
             if media.imdb_id:
                 stmt = select(Episode).where(Episode.show_id == media.id)
                 show_eps = session.execute(stmt).scalars().all()
@@ -270,14 +380,84 @@ class MetadataHydrationService:
         return poster_updated, episodes_updated
 
 
-def hydrate_all_metadata(db_engine: Engine, limit: int = 1000) -> dict[str, int]:
-    """Batch hydrate posters and episode titles for all media items in SQLite."""
+def prune_synthetic_episode_catalog(db_engine: Engine) -> int:
+    """Remove provider rows outside Trakt's progress cap without losing history."""
+    protected_episode_ids = select(WatchEvent.episode_id).where(
+        WatchEvent.episode_id.is_not(None)
+    ).union(
+        select(PlaybackState.episode_id).where(PlaybackState.episode_id.is_not(None)),
+        select(NowWatching.episode_id),
+    )
+
+    with get_db_session(db_engine) as session:
+        eligible_candidate_ids: set[int] = set()
+        show_ids = session.execute(
+            select(MediaItem.id).where(MediaItem.media_type == "show")
+        ).scalars().all()
+        for show_id in show_ids:
+            catalog = get_show_progress_catalog(
+                session=session,
+                account_id=1,
+                show_id=show_id,
+                include_specials=False,
+            )
+            eligible_candidate_ids.update(
+                episode.id for episode in catalog.episodes if episode.trakt_id < 0
+            )
+
+        result = cast(
+            CursorResult[Any],
+            session.execute(
+                delete(Episode).where(
+                    Episode.trakt_id < 0,
+                    Episode.id.not_in(protected_episode_ids),
+                    Episode.id.not_in(eligible_candidate_ids),
+                )
+            ),
+        )
+        return int(result.rowcount or 0)
+
+
+def hydrate_all_metadata(db_engine: Engine, limit: int = 75) -> dict[str, int | str]:
+    """Hydrate the items that still lack dependable metadata, in bounded batches."""
+    pruned_synthetic_episodes = prune_synthetic_episode_catalog(db_engine)
     service = MetadataHydrationService()
     posters_updated_total = 0
     episodes_updated_total = 0
 
     with get_db_session(db_engine) as session:
-        items = session.execute(select(MediaItem).limit(limit)).scalars().all()
+        # Only spend network work where it can improve the experience. Shows
+        # with a missing episode schedule are included even when their card art
+        # is already present, so forecasts stay release-aware.
+        incomplete_episode = (
+            select(Episode.id)
+            .where(
+                Episode.show_id == MediaItem.id,
+                or_(
+                    Episode.runtime_minutes.is_(None),
+                    Episode.first_aired.is_(None),
+                    Episode.title.is_(None),
+                ),
+            )
+            .exists()
+        )
+        pending = or_(
+            MediaItem.poster_url.is_(None),
+            MediaItem.backdrop_url.is_(None),
+            MediaItem.runtime_minutes.is_(None),
+            MediaItem.first_aired.is_(None),
+            incomplete_episode,
+        )
+        items = session.execute(
+            select(MediaItem)
+            .where(pending)
+            .order_by(
+                MediaItem.poster_url.is_(None).desc(),
+                MediaItem.runtime_minutes.is_(None).desc(),
+                MediaItem.id.desc(),
+            )
+            .limit(limit)
+        ).scalars().all()
 
         for media in items:
             p_up, ep_up = service.hydrate_item(session, media)
@@ -294,8 +474,11 @@ def hydrate_all_metadata(db_engine: Engine, limit: int = 1000) -> dict[str, int]
     )
 
     return {
+        "items_checked": len(items),
         "posters_updated": posters_updated_total,
         "episodes_updated": episodes_updated_total,
+        "synthetic_episodes_pruned": pruned_synthetic_episodes,
+        "provider": "tmdb" if service.tmdb.is_configured else "tvmaze_fallback",
     }
 
 
@@ -304,7 +487,7 @@ def start_background_metadata_hydration(db_engine: Engine) -> None:
 
     def _worker() -> None:
         try:
-            hydrate_all_metadata(db_engine, limit=1000)
+            hydrate_all_metadata(db_engine)
         except Exception as e:
             logger.warning("Background metadata hydration warning: %s", e)
 

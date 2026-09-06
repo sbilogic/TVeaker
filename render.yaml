@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: tveaker
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: TVEAKER_ENV
+        value: production
+      - key: TVEAKER_HOST
+        value: 0.0.0.0
+      - key: TVEAKER_DATABASE_PATH
+        value: data/tveaker.db
+      - key: TVEAKER_SECRET_KEY
+        generateValue: true
+      - key: TRAKT_CLIENT_ID
+        sync: false
+      - key: TRAKT_CLIENT_SECRET
+        sync: false
+      - key: TRAKT_REDIRECT_URI
+        sync: false
+      - key: TMDB_ACCESS_TOKEN
+        sync: false

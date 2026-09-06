@@ -42,6 +42,9 @@ class Account(Base):
     playback_states: Mapped[list["PlaybackState"]] = relationship(
         "PlaybackState", back_populates="account", cascade="all, delete-orphan"
     )
+    now_watching: Mapped["NowWatching | None"] = relationship(
+        "NowWatching", back_populates="account", cascade="all, delete-orphan", uselist=False
+    )
     ratings: Mapped[list["Rating"]] = relationship(
         "Rating", back_populates="account", cascade="all, delete-orphan"
     )
@@ -69,6 +72,7 @@ class MediaItem(Base):
     year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     overview: Mapped[str | None] = mapped_column(Text, nullable=True)
     runtime_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    trakt_aired_episodes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str | None] = mapped_column(String, nullable=True)
     genres_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     poster_url: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -193,6 +197,23 @@ class PlaybackState(Base):
             name="ck_playback_states_target",
         ),
     )
+
+
+class NowWatching(Base):
+    """A local, user-selected episode to resume or mark watched next."""
+
+    __tablename__ = "now_watching"
+
+    account_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    episode_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("episodes.id", ondelete="CASCADE"), nullable=False
+    )
+    selected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    account: Mapped["Account"] = relationship("Account", back_populates="now_watching")
+    episode: Mapped["Episode"] = relationship("Episode")
 
 
 class Rating(Base):

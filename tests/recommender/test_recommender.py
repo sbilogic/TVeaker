@@ -127,6 +127,7 @@ def recommender_env():
                 episode_number=ep_num,
                 title=f"S01E0{ep_num}",
                 runtime_minutes=50,
+                first_aired=now - timedelta(days=10 - ep_num),
             )
             session.add(ep)
             session.flush()
