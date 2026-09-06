@@ -9,12 +9,34 @@ import androidx.compose.ui.graphics.Color
 // Editorial signal palette. Background, surface, text, and border aliases resolve
 // through MaterialTheme so legacy screens inherit light and dark mode automatically.
 val StripeIris = Color(0xFF174CFF)
-val StripeCyan = Color(0xFF174CFF)
+val StripeCyan = Color(0xFF00C6D7)
 val StripeViolet = Color(0xFF4F73FF)
 val StripeEmerald = Color(0xFF1D7A58)
 val StripeAmber = Color(0xFFB36B00)
 val StripeRose = Color(0xFFB9343D)
 val StripePink = Color(0xFFC53E79)
+
+// Cinema-grade multi-stop poster and backdrop scrim gradients for text legibility
+val PosterScrimVertical = Brush.verticalGradient(
+    0.0f to Color.Transparent,
+    0.45f to Color.Black.copy(alpha = 0.35f),
+    0.80f to Color.Black.copy(alpha = 0.82f),
+    1.0f to Color.Black.copy(alpha = 0.96f)
+)
+
+val PosterScrimHorizontal = Brush.horizontalGradient(
+    0.0f to Color.Black.copy(alpha = 0.90f),
+    0.55f to Color.Black.copy(alpha = 0.60f),
+    1.0f to Color.Transparent
+)
+
+val HeroArtworkScrim = Brush.verticalGradient(
+    0.0f to Color.Black.copy(alpha = 0.20f),
+    0.40f to Color.Transparent,
+    0.75f to Color.Black.copy(alpha = 0.60f),
+    1.0f to Color.Black.copy(alpha = 0.92f)
+)
+
 
 val BgBase: Color
     @Composable @ReadOnlyComposable get() = MaterialTheme.colorScheme.background

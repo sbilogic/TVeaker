@@ -1,10 +1,67 @@
 package com.tveaker.app.ui.theme
 
+import android.graphics.Typeface
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+
+val EditorialCondensed = FontFamily(Typeface.create("sans-serif-condensed", Typeface.BOLD))
+val EditorialSerif = FontFamily.Serif
+
+object EditorialTypography {
+    val HeadlineHeroCompact = TextStyle(
+        fontFamily = EditorialCondensed,
+        fontWeight = FontWeight.Black,
+        fontSize = 82.sp,
+        lineHeight = 84.sp,
+        letterSpacing = (-3).sp
+    )
+    val HeadlineHeroStandard = TextStyle(
+        fontFamily = EditorialCondensed,
+        fontWeight = FontWeight.Black,
+        fontSize = 118.sp,
+        lineHeight = 120.sp,
+        letterSpacing = (-3).sp
+    )
+    val SubheadSerif = TextStyle(
+        fontFamily = EditorialSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        lineHeight = 20.sp
+    )
+    val MetricForecastCompact = TextStyle(
+        fontFamily = EditorialSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 48.sp,
+        lineHeight = 48.sp
+    )
+    val MetricForecastStandard = TextStyle(
+        fontFamily = EditorialSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 72.sp,
+        lineHeight = 70.sp
+    )
+    val SectionEyebrow = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 9.sp,
+        letterSpacing = 1.45.sp
+    )
+    val BadgePill = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 9.sp,
+        letterSpacing = 0.6.sp
+    )
+    val ShowTitleSerif = TextStyle(
+        fontFamily = EditorialSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp,
+        lineHeight = 22.sp
+    )
+}
 
 val Typography = Typography(
     displayLarge = TextStyle(

@@ -151,8 +151,9 @@ fun ShowsScreen(viewModel: ShowsViewModel) {
     }
 
     state.selectedShowUnwatched?.let { data ->
-        UnwatchedEpisodesBottomSheet(
+        EditorialEpisodesSheet(
             data = data,
+            nowWatchingEpisodeId = null,
             onDismiss = viewModel::dismissEpisodesSheet,
             onWatchEpisode = { viewModel.markEpisodeWatched(data.showId, it) },
             onSelectNowWatching = viewModel::selectNowWatching

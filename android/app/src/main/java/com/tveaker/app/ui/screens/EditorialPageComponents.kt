@@ -1,6 +1,7 @@
 package com.tveaker.app.ui.screens
 
 import android.graphics.Typeface
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -106,6 +107,39 @@ internal fun EditorialSectionLabel(text: String, modifier: Modifier = Modifier) 
         letterSpacing = 1.45.sp,
         modifier = modifier
     )
+}
+
+@Composable
+internal fun EditorialBadge(
+    text: String,
+    modifier: Modifier = Modifier,
+    tint: Color = StripeIris,
+    containerColor: Color = tint.copy(alpha = 0.12f),
+    borderColor: Color? = tint.copy(alpha = 0.35f),
+    icon: (@Composable () -> Unit)? = null
+) {
+    Surface(
+        modifier = modifier,
+        color = containerColor,
+        shape = RectangleShape,
+        border = borderColor?.let { BorderStroke(1.dp, it) }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            icon?.invoke()
+            Text(
+                text = text.uppercase(),
+                color = tint,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 @Composable

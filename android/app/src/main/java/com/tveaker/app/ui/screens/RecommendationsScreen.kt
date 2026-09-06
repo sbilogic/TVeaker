@@ -1,6 +1,7 @@
 package com.tveaker.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -123,18 +124,27 @@ fun RecommendationsScreen(viewModel: RecommendationsViewModel) {
 @Composable
 fun CleanRecommendationCard(item: RecommendationItemDto, onAction: (String) -> Unit) {
     val compact = LocalCompactMode.current
+    val colors = MaterialTheme.colorScheme
     EditorialPageCard {
         Column(modifier = Modifier.padding(vertical = if (compact) 6.dp else 9.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 14.dp), verticalAlignment = Alignment.Top) {
                 if (!item.posterUrl.isNullOrEmpty()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current).data(artworkUrl(item.posterUrl)).crossfade(true).build(),
-                        contentDescription = item.title,
+                        contentDescription = "${item.title} poster",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(width = if (compact) 50.dp else 58.dp, height = if (compact) 72.dp else 84.dp)
+                        modifier = Modifier
+                            .size(width = if (compact) 50.dp else 58.dp, height = if (compact) 72.dp else 84.dp)
+                            .border(1.dp, colors.outlineVariant, RectangleShape)
                     )
                 } else {
-                    Box(modifier = Modifier.size(width = if (compact) 50.dp else 58.dp, height = if (compact) 72.dp else 84.dp).background(StripeIris.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = if (compact) 50.dp else 58.dp, height = if (compact) 72.dp else 84.dp)
+                            .background(StripeIris.copy(alpha = .12f))
+                            .border(1.dp, colors.outlineVariant, RectangleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = StripeIris, modifier = Modifier.size(24.dp))
                     }
                 }
@@ -145,11 +155,29 @@ fun CleanRecommendationCard(item: RecommendationItemDto, onAction: (String) -> U
                             Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = TextMuted, modifier = Modifier.size(17.dp))
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (compact) 5.dp else 9.dp)) {
-                        Surface(color = StripeViolet.copy(alpha = .14f), shape = RectangleShape) {
-                            Text("${(item.score * 100).toInt()}% MATCH", color = StripeIris, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = .5.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (compact) 4.dp else 6.dp)) {
+                        EditorialBadge(
+                            text = "${(item.score * 100).toInt()}% MATCH",
+                            tint = StripeViolet,
+                            containerColor = StripeViolet.copy(alpha = 0.14f),
+                            borderColor = StripeViolet.copy(alpha = 0.35f)
+                        )
+                        Text("${item.mediaType.uppercase()} · ${item.runtimeMinutes ?: 45} MIN", color = TextMuted, fontSize = 10.sp, letterSpacing = .4.sp)
+                    }
+                    if (item.genres.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            item.genres.take(2).forEach { genre ->
+                                EditorialBadge(
+                                    text = genre,
+                                    tint = StripeIris,
+                                    containerColor = StripeIris.copy(alpha = 0.08f),
+                                    borderColor = StripeIris.copy(alpha = 0.25f)
+                                )
+                            }
                         }
-                        Text("${item.mediaType.uppercase()} · ${item.runtimeMinutes ?: 45}M", color = TextMuted, fontSize = 10.sp, letterSpacing = .4.sp)
                     }
                 }
             }
