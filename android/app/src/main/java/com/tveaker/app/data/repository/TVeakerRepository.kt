@@ -56,7 +56,10 @@ open class TVeakerRepository(
     fun getApiService(): TVeakerApiService = apiService
 
     /** Executes against the explicit online gateway configured by the user. */
-    private suspend fun <T> executeWithFallback(block: suspend (TVeakerApiService) -> T): Result<T> = withContext(ioDispatcher) {
+    private suspend fun <T> executeWithFallback(
+        markOfflineOnFailure: Boolean = true,
+        block: suspend (TVeakerApiService) -> T
+    ): Result<T> = withContext(ioDispatcher) {
         if (!GatewayUrl.isConfigured(_currentBaseUrl.value)) {
             _isOffline.value = true
             return@withContext Result.failure(
@@ -66,7 +69,7 @@ open class TVeakerRepository(
         val result = runCatching { block(apiService) }
         if (result.isSuccess) {
             _isOffline.value = false
-        } else {
+        } else if (markOfflineOnFailure) {
             val ex = result.exceptionOrNull()
             val isConnectivityError = ex is java.io.IOException ||
                 ex is IllegalStateException ||
@@ -220,7 +223,7 @@ open class TVeakerRepository(
         it.hydrateMissingMetadata()
     }
 
-    open suspend fun getAppVersion(): Result<AppVersionDto> = executeWithFallback {
+    open suspend fun getAppVersion(): Result<AppVersionDto> = executeWithFallback(markOfflineOnFailure = false) {
         it.getAppVersion()
     }
 }

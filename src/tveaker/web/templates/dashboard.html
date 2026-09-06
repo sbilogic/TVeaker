@@ -21,43 +21,35 @@
     </section>
 
     <section class="focus-spread">
-      {% if now_watching %}
-        <button class="poster-button" type="button" onclick="openEpisodesDrawer({{ now_watching.show_id }}, '{{ now_watching.show_title | replace("'", "\\'") }}')" aria-label="Choose another {{ now_watching.show_title }} episode"><span class="poster-fallback">{{ now_watching.show_title }}</span></button>
-        <div class="focus-copy">
-          <p class="section-index">01 / NOW WATCHING</p>
-          <h2>{{ now_watching.show_title }}</h2>
-          <p class="episode-line">S{{ '%02d' | format(now_watching.season_number) }}E{{ '%02d' | format(now_watching.episode_number) }} · {{ now_watching.episode_title or 'Untitled episode' }}</p>
-          <div class="focus-divider"></div>
-          <div class="forecast-block">
-            <span>YOUR PICK</span>
-            <strong>{% if now_watching.runtime_minutes %}{{ now_watching.runtime_minutes }}m{% else %}READY{% endif %}</strong>
-            <small>LOCAL ONLY · NOT SENT TO TRAKT</small>
-          </div>
-          <div class="focus-actions">
-            <button class="resume-action" type="button" onclick="openEpisodesDrawer({{ now_watching.show_id }}, '{{ now_watching.show_title | replace("'", "\\'") }}')">Change episode <span class="material-symbols-rounded">arrow_forward</span></button>
-            <button class="watched-action" type="button" onclick="watchSpecificEpisode({{ now_watching.show_id }}, {{ now_watching.episode_id }}, '{{ (now_watching.episode_title or 'Untitled episode') | replace("'", "\\'") }}')"><span class="material-symbols-rounded">check</span> Mark watched</button>
-          </div>
+      <button class="poster-button" type="button" onclick="openEpisodesDrawer({{ focus.show_id }}, '{{ focus.title | replace("'", "\\'") }}')" aria-label="Open {{ focus.title }} episodes">
+        {% if focus.backdrop_url or focus.poster_url %}<img src="{{ focus.backdrop_url or focus.poster_url }}" alt="{{ focus.title }} poster">{% else %}<span class="poster-fallback">{{ focus.title }}</span>{% endif %}
+      </button>
+      <div class="focus-copy">
+        <p class="section-index">01 / {% if now_watching and now_watching.show_id == focus.show_id %}NOW WATCHING{% else %}CONTINUE{% endif %}</p>
+        <h2>{{ focus.title }}</h2>
+        <p class="episode-line">
+          {% if now_watching and now_watching.show_id == focus.show_id %}
+            S{{ '%02d' | format(now_watching.season_number) }}E{{ '%02d' | format(now_watching.episode_number) }} · {{ now_watching.episode_title or 'Untitled episode' }} · {{ focus.remaining_episodes }} LEFT
+          {% else %}
+            {{ focus.remaining_episodes }} EPISODE{% if focus.remaining_episodes != 1 %}S{% endif %} LEFT
+          {% endif %}
+        </p>
+        <div class="focus-divider"></div>
+        <div class="forecast-block">
+          <span>FINISH FORECAST</span>
+          <strong>{{ focus.remaining_runtime_display or ((focus.unwatched_minutes // 60) ~ 'h ' ~ (focus.unwatched_minutes % 60) ~ 'm') }}</strong>
+          <small>{% if focus.estimated_finish_date %}{{ focus.estimated_finish_date.strftime('%b %d') | upper }}{% else %}AT YOUR PACE{% endif %}</small>
         </div>
-      {% else %}
-        <button class="poster-button" type="button" onclick="openEpisodesDrawer({{ focus.show_id }}, '{{ focus.title | replace("'", "\\'") }}')" aria-label="Open {{ focus.title }} episodes">
-          {% if focus.backdrop_url or focus.poster_url %}<img src="{{ focus.backdrop_url or focus.poster_url }}" alt="{{ focus.title }} poster">{% else %}<span class="poster-fallback">{{ focus.title }}</span>{% endif %}
-        </button>
-        <div class="focus-copy">
-          <p class="section-index">01 / CONTINUE</p>
-          <h2>{{ focus.title }}</h2>
-          <p class="episode-line">{{ focus.remaining_episodes }} EPISODE{% if focus.remaining_episodes != 1 %}S{% endif %} LEFT</p>
-          <div class="focus-divider"></div>
-          <div class="forecast-block">
-            <span>FINISH FORECAST</span>
-            <strong>{{ focus.remaining_runtime_display or ((focus.unwatched_minutes // 60) ~ 'h ' ~ (focus.unwatched_minutes % 60) ~ 'm') }}</strong>
-            <small>{% if focus.estimated_finish_date %}{{ focus.estimated_finish_date.strftime('%b %d') | upper }}{% else %}AT YOUR PACE{% endif %}</small>
-          </div>
-          <div class="focus-actions">
+        <div class="focus-actions">
+          {% if now_watching and now_watching.show_id == focus.show_id %}
+            <button class="resume-action" type="button" onclick="openEpisodesDrawer({{ focus.show_id }}, '{{ focus.title | replace("'", "\\'") }}')">Resume S{{ '%02d' | format(now_watching.season_number) }}E{{ '%02d' | format(now_watching.episode_number) }} <span class="material-symbols-rounded">arrow_forward</span></button>
+            <button class="watched-action" type="button" onclick="watchSpecificEpisode({{ now_watching.show_id }}, {{ now_watching.episode_id }}, '{{ (now_watching.episode_title or 'Untitled episode') | replace("'", "\\'") }}')"><span class="material-symbols-rounded">check</span> Mark watched</button>
+          {% else %}
             <button class="resume-action" type="button" onclick="openEpisodesDrawer({{ focus.show_id }}, '{{ focus.title | replace("'", "\\'") }}')">Choose episode <span class="material-symbols-rounded">arrow_forward</span></button>
             {% if focus.remaining_episodes > 0 %}<button class="watched-action" type="button" onclick="quickScrobble({{ focus.show_id }}, '{{ focus.title | replace("'", "\\'") }}')"><span class="material-symbols-rounded">check</span> Quick mark</button>{% endif %}
-          </div>
+          {% endif %}
         </div>
-      {% endif %}
+      </div>
     </section>
 
     {% if recommendation %}

@@ -184,9 +184,16 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary, focusedBorderColor = StripeIris, unfocusedBorderColor = BorderSubtle, focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedContainerColor = MaterialTheme.colorScheme.surface)
                 )
                 Text("On the PC, run `tveaker phone-gateway`, then paste its HTTPS URL here. Keep that PC terminal open while you use the phone.", color = TextMuted, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(top = if (compactMode) 9.dp else 14.dp))
-                EditorialSectionLabel("DEVELOPMENT", Modifier.padding(top = if (compactMode) 9.dp else 16.dp))
+                EditorialSectionLabel("GATEWAY PRESETS", Modifier.padding(top = if (compactMode) 9.dp else 16.dp))
                 Row(modifier = Modifier.fillMaxWidth().padding(top = if (compactMode) 5.dp else 9.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GatewayPreset("EMULATOR", "10.0.2.2", Modifier.weight(1f)) { urlInput = "http://10.0.2.2:8000/"; viewModel.setBaseUrl(urlInput) }
+                    GatewayPreset("RENDER CLOUD", "tveaker.onrender.com", Modifier.weight(1f)) {
+                        urlInput = GatewayUrl.CLOUD_RENDER_URL
+                        viewModel.setBaseUrl(urlInput)
+                    }
+                    GatewayPreset("EMULATOR", "10.0.2.2", Modifier.weight(1f)) {
+                        urlInput = "http://10.0.2.2:8000/"
+                        viewModel.setBaseUrl(urlInput)
+                    }
                 }
                 EditorialPrimaryButton("APPLY & SAVE GATEWAY", { viewModel.setBaseUrl(urlInput) }, modifier = Modifier.fillMaxWidth().padding(top = if (compactMode) 8.dp else 14.dp))
             }

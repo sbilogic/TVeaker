@@ -147,16 +147,6 @@ fun EditorialDashboardScreen(
                         onMarkWatched = { viewModel.quickScrobble(focusShow.showId) }
                     )
                 }
-            } else if (nowWatching != null) {
-                item {
-                    EditorialNowWatchingHero(
-                        nowWatching = nowWatching,
-                        onChangeEpisode = { viewModel.loadUnwatchedEpisodes(nowWatching.showId) },
-                        onMarkWatched = {
-                            viewModel.markEpisodeWatched(nowWatching.showId, nowWatching.episodeId)
-                        }
-                    )
-                }
             } else {
                 item {
                     if (state.isLoading) {
@@ -216,71 +206,7 @@ fun EditorialDashboardScreen(
     }
 }
 
-@Composable
-private fun EditorialNowWatchingHero(
-    nowWatching: NowWatchingDto,
-    onChangeEpisode: () -> Unit,
-    onMarkWatched: () -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
-    val compact = LocalCompactMode.current
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(top = if (compact) 14.dp else 24.dp),
-        color = colors.surface,
-        shape = RectangleShape,
-        border = BorderStroke(1.dp, colors.primary)
-    ) {
-        Column(modifier = Modifier.padding(if (compact) 14.dp else 20.dp)) {
-            EditorialSectionLabel("01 / NOW WATCHING")
-            Text(
-                nowWatching.showTitle,
-                color = colors.onSurface,
-                fontFamily = FontFamily.Serif,
-                fontSize = if (compact) 29.sp else 34.sp,
-                lineHeight = if (compact) 31.sp else 36.sp,
-                modifier = Modifier.padding(top = 6.dp)
-            )
-            Text(
-                "S${nowWatching.seasonNumber.toString().padStart(2, '0')}E${nowWatching.episodeNumber.toString().padStart(2, '0')} · ${nowWatching.episodeTitle ?: "Untitled episode"}",
-                color = colors.primary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 6.dp)
-            )
-            Text(
-                "Chosen locally. It will only be marked watched when you say so.",
-                color = colors.onSurfaceVariant,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 6.dp)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = if (compact) 12.dp else 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onChangeEpisode,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    shape = RectangleShape
-                ) {
-                    Text("CHANGE", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-                Button(
-                    onClick = onMarkWatched,
-                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                    shape = RectangleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.onBackground,
-                        contentColor = colors.background
-                    )
-                ) {
-                    Icon(Icons.Default.Check, null, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("MARK WATCHED", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
+
 
 @Composable
 private fun EditorialHeader(
@@ -682,7 +608,7 @@ private fun EditorialEpisodesSheet(
                             ) {
                                 Icon(Icons.Default.PlayArrow, null, tint = colors.primary, modifier = Modifier.size(13.dp))
                                 Spacer(Modifier.width(2.dp))
-                                Text("SET HERO", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
+                                Text("RESUME HERE", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
                             }
                             Spacer(Modifier.width(4.dp))
                             IconButton(onClick = { onWatchEpisode(episode.id) }, modifier = Modifier.size(32.dp)) {

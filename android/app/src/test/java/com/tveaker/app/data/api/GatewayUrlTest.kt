@@ -7,9 +7,9 @@ import org.junit.Test
 
 class GatewayUrlTest {
     @Test
-    fun physicalPhonesStartUnconfiguredInsteadOfUsingTheOldLanIp() {
-        assertEquals(GatewayUrl.UNCONFIGURED_BASE_URL, GatewayUrl.defaultForDevice(isEmulator = false))
-        assertFalse(GatewayUrl.isConfigured(GatewayUrl.defaultForDevice(isEmulator = false)))
+    fun physicalPhonesStartWithCloudRenderByDefault() {
+        assertEquals(GatewayUrl.CLOUD_RENDER_URL, GatewayUrl.defaultForDevice(isEmulator = false))
+        assertTrue(GatewayUrl.isConfigured(GatewayUrl.defaultForDevice(isEmulator = false)))
         assertTrue(GatewayUrl.isLegacyLanUrl("http://192.168.1.33:8000/"))
         assertTrue(GatewayUrl.isLegacyLanUrl("http://192.168.0.2:8000/"))
         assertFalse(GatewayUrl.isConfigured("http://192.168.0.2:8000/"))

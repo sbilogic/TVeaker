@@ -19,7 +19,7 @@ class TVeakerApplication : Application() {
         val prefs = getSharedPreferences("tveaker_prefs", Context.MODE_PRIVATE)
         val defaultUrl = GatewayUrl.defaultForDevice(isEmulator())
         val storedUrl = prefs.getString("base_url", null)
-        val savedUrl = if (storedUrl == null || GatewayUrl.isLegacyLanUrl(storedUrl)) {
+        val savedUrl = if (storedUrl == null || GatewayUrl.isLegacyLanUrl(storedUrl) || storedUrl == GatewayUrl.UNCONFIGURED_BASE_URL) {
             defaultUrl
         } else {
             storedUrl

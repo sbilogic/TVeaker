@@ -6,6 +6,7 @@ package com.tveaker.app.data.api
  */
 object GatewayUrl {
     const val UNCONFIGURED_BASE_URL = "https://tveaker.invalid/"
+    const val CLOUD_RENDER_URL = "https://tveaker.onrender.com/"
     private const val EMULATOR_BASE_URL = "http://10.0.2.2:8000/"
     private val legacyLanUrls = setOf(
         "http://192.168.1.33:8000/",
@@ -15,7 +16,7 @@ object GatewayUrl {
     )
 
     fun defaultForDevice(isEmulator: Boolean): String =
-        if (isEmulator) EMULATOR_BASE_URL else UNCONFIGURED_BASE_URL
+        if (isEmulator) EMULATOR_BASE_URL else CLOUD_RENDER_URL
 
     fun isConfigured(baseUrl: String): Boolean =
         baseUrl.trim().isNotEmpty() && !isLegacyLanUrl(baseUrl) && baseUrl != UNCONFIGURED_BASE_URL
