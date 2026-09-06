@@ -94,7 +94,8 @@ class FeedbackRequest(BaseModel):
 
 
 class NowWatchingSelectionRequest(BaseModel):
-    episode_id: int = Field(gt=0)
+    episode_id: int | None = Field(default=None, gt=0)
+    show_id: int | None = Field(default=None, gt=0)
 
 
 def _now_watching_payload(session: Any, account_id: int = 1) -> dict[str, Any] | None:
@@ -143,11 +144,17 @@ def view_dashboard(request: Request) -> HTMLResponse:
         now_watching = _now_watching_payload(session)
 
     estimator = ShowFinishEstimator(db_engine=db_engine, clock=clock)
-    estimates = [
+    all_watching = [
         estimate
         for estimate in estimator.estimate_all(status="watching")
         if estimate.remaining_episodes > 0
     ]
+    if now_watching:
+        focus_list = [e for e in all_watching if e.show_id == now_watching["show_id"]]
+        remaining_list = [e for e in all_watching if e.show_id != now_watching["show_id"]]
+        estimates = focus_list + remaining_list
+    else:
+        estimates = all_watching
 
     recommender = RecommendationEngine(db_engine=db_engine, clock=clock)
     rec_result = recommender.recommend(context=RankingContext(intent="auto"), limit=6)
@@ -544,9 +551,45 @@ def api_set_now_watching(
     now = clock.now()
 
     with get_db_session(db_engine) as session:
-        episode = session.get(Episode, payload.episode_id)
-        if episode is None:
-            raise HTTPException(status_code=404, detail="Episode not found.")
+        if payload.episode_id is not None:
+            episode = session.get(Episode, payload.episode_id)
+            if episode is None:
+                raise HTTPException(status_code=404, detail="Episode not found.")
+        elif payload.show_id is not None:
+            show = session.get(MediaItem, payload.show_id)
+            if show is None:
+                raise HTTPException(status_code=404, detail="Show not found.")
+            tracked = session.get(TrackedShow, (1, show.id))
+            catalog = get_show_progress_catalog(
+                session=session,
+                account_id=1,
+                show_id=show.id,
+                include_specials=tracked.include_specials if tracked is not None else False,
+            )
+            episodes_list = list(catalog.episodes)
+            if not episodes_list:
+                raise HTTPException(status_code=400, detail="Show has no episodes.")
+            watched_ids = set(
+                session.execute(
+                    select(WatchEvent.episode_id).where(
+                        WatchEvent.account_id == 1,
+                        WatchEvent.episode_id.in_([e.id for e in episodes_list]),
+                    )
+                ).scalars().all()
+            )
+            unwatched = [
+                e
+                for e in episodes_list
+                if e.id not in watched_ids
+                and (
+                    is_episode_released(e.first_aired, now)
+                    or e.id in catalog.source_confirmed_episode_ids
+                )
+            ]
+            episode = unwatched[0] if unwatched else episodes_list[-1]
+        else:
+            raise HTTPException(status_code=400, detail="Must provide show_id or episode_id.")
+
         tracked = session.get(TrackedShow, (1, episode.show_id))
         catalog = get_show_progress_catalog(
             session=session,
@@ -571,7 +614,7 @@ def api_set_now_watching(
             .where(WatchEvent.account_id == 1, WatchEvent.episode_id == episode.id)
             .limit(1)
         ).scalar_one_or_none()
-        if watched is not None:
+        if watched is not None and payload.episode_id is not None:
             raise HTTPException(status_code=409, detail="Episode is already marked watched.")
 
         selection = session.get(NowWatching, 1)

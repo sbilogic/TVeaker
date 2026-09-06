@@ -28,6 +28,20 @@ open class TVeakerRepository(
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
 
+    private val _selectedHeroShowId = MutableStateFlow<Int?>(
+        prefs?.getInt("selected_hero_show_id", -1)?.takeIf { it != -1 }
+    )
+    val selectedHeroShowId: StateFlow<Int?> = _selectedHeroShowId.asStateFlow()
+
+    fun setHeroShow(showId: Int?) {
+        _selectedHeroShowId.value = showId
+        if (showId != null) {
+            prefs?.edit()?.putInt("selected_hero_show_id", showId)?.apply()
+        } else {
+            prefs?.edit()?.remove("selected_hero_show_id")?.apply()
+        }
+    }
+
     @Volatile
     private var apiService: TVeakerApiService = initialApiService ?: TVeakerApiService.create(_currentBaseUrl.value)
 
@@ -123,9 +137,10 @@ open class TVeakerRepository(
         }
     }
 
-    suspend fun selectNowWatching(episodeId: Int): Result<NowWatchingDto> {
+    suspend fun selectNowWatchingShow(showId: Int): Result<NowWatchingDto> {
+        setHeroShow(showId)
         val result = executeWithFallback {
-            it.selectNowWatching(NowWatchingSelectionRequest(episodeId))
+            it.selectNowWatching(NowWatchingSelectionRequest(showId = showId))
         }
         if (result.isSuccess) {
             localCache.saveNowWatching(result.getOrThrow())
@@ -133,7 +148,20 @@ open class TVeakerRepository(
         return result
     }
 
+    suspend fun selectNowWatching(episodeId: Int): Result<NowWatchingDto> {
+        val result = executeWithFallback {
+            it.selectNowWatching(NowWatchingSelectionRequest(episodeId = episodeId))
+        }
+        if (result.isSuccess) {
+            val dto = result.getOrThrow()
+            setHeroShow(dto.showId)
+            localCache.saveNowWatching(dto)
+        }
+        return result
+    }
+
     suspend fun clearNowWatching(): Result<Unit> {
+        setHeroShow(null)
         val result = executeWithFallback {
             it.clearNowWatching()
             Unit

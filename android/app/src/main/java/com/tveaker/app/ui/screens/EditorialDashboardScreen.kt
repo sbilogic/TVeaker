@@ -50,6 +50,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -83,12 +86,15 @@ fun EditorialDashboardScreen(
     val state by viewModel.uiState.collectAsState()
     val compact = LocalCompactMode.current
     val nowWatching = state.nowWatching
-    val focusShow = state.activeShows
-        .filter { it.remainingEpisodes > 0 }
-        .minWithOrNull(compareBy<ShowEstimateDto> { it.remainingEpisodes }.thenByDescending { it.completionPercent })
+    var showPickerVisible by remember { mutableStateOf(false) }
+    val focusShow = state.activeShows.find { it.showId == state.selectedHeroShowId && it.remainingEpisodes > 0 }
+        ?: state.activeShows.find { it.showId == nowWatching?.showId && it.remainingEpisodes > 0 }
+        ?: state.activeShows.filter { it.remainingEpisodes > 0 }.minWithOrNull(
+            compareBy<ShowEstimateDto> { it.remainingEpisodes }.thenByDescending { it.completionPercent }
+        )
         ?: state.activeShows.firstOrNull()
     val queue = state.activeShows
-        .filter { it.showId != (nowWatching?.showId ?: focusShow?.showId) }
+        .filter { it.showId != focusShow?.showId }
         .take(4)
     val recommendation = state.recommendations.firstOrNull()
     val availableUpdate = state.serverVersionInfo?.takeIf { state.isNewUpdateAvailable }
@@ -132,7 +138,16 @@ fun EditorialDashboardScreen(
                 }
             }
 
-            if (nowWatching != null) {
+            if (focusShow != null) {
+                item {
+                    EditorialHero(
+                        show = focusShow,
+                        onOpenEpisodes = { viewModel.loadUnwatchedEpisodes(focusShow.showId) },
+                        onSwitchShow = { showPickerVisible = true },
+                        onMarkWatched = { viewModel.quickScrobble(focusShow.showId) }
+                    )
+                }
+            } else if (nowWatching != null) {
                 item {
                     EditorialNowWatchingHero(
                         nowWatching = nowWatching,
@@ -142,21 +157,13 @@ fun EditorialDashboardScreen(
                         }
                     )
                 }
-            } else if (focusShow == null) {
+            } else {
                 item {
                     if (state.isLoading) {
                         EditorialLoadingState()
                     } else {
                         EditorialEmptyState(onSync = { viewModel.triggerSync("incremental") })
                     }
-                }
-            } else {
-                item {
-                    EditorialHero(
-                        show = focusShow,
-                        onOpenEpisodes = { viewModel.loadUnwatchedEpisodes(focusShow.showId) },
-                        onMarkWatched = { viewModel.quickScrobble(focusShow.showId) }
-                    )
                 }
             }
 
@@ -177,10 +184,26 @@ fun EditorialDashboardScreen(
             if (queue.isNotEmpty()) {
                 item { EditorialSectionLabel("03 / YOUR QUEUE", Modifier.padding(top = if (compact) 18.dp else 34.dp, bottom = if (compact) 5.dp else 8.dp)) }
                 items(queue) { show ->
-                    EditorialQueueRow(show = show, onClick = { viewModel.loadUnwatchedEpisodes(show.showId) })
+                    EditorialQueueRow(
+                        show = show,
+                        onClick = { viewModel.loadUnwatchedEpisodes(show.showId) },
+                        onSetHero = { viewModel.setHeroShow(show.showId) }
+                    )
                 }
             }
         }
+    }
+
+    if (showPickerVisible) {
+        EditorialShowPickerSheet(
+            shows = state.activeShows,
+            selectedShowId = focusShow?.showId,
+            onSelect = { showId ->
+                viewModel.setHeroShow(showId)
+                showPickerVisible = false
+            },
+            onDismiss = { showPickerVisible = false }
+        )
     }
 
     state.selectedShowUnwatched?.let { data ->
@@ -346,7 +369,12 @@ internal fun EditorialUpdateNotice(
 }
 
 @Composable
-private fun EditorialHero(show: ShowEstimateDto, onOpenEpisodes: () -> Unit, onMarkWatched: () -> Unit) {
+private fun EditorialHero(
+    show: ShowEstimateDto,
+    onOpenEpisodes: () -> Unit,
+    onSwitchShow: () -> Unit,
+    onMarkWatched: () -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val compact = LocalCompactMode.current
     val condensed = FontFamily(Typeface.create("sans-serif-condensed", Typeface.BOLD))
@@ -434,19 +462,19 @@ private fun EditorialHero(show: ShowEstimateDto, onOpenEpisodes: () -> Unit, onM
                         modifier = Modifier.weight(1f).heightIn(min = 44.dp),
                         shape = RectangleShape,
                         colors = ButtonDefaults.buttonColors(containerColor = colors.onBackground, contentColor = colors.background),
-                        contentPadding = PaddingValues(horizontal = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 6.dp)
                     ) {
                         Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(15.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("RESUME", fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
+                        Spacer(Modifier.width(3.dp))
+                        Text("RESUME", fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp)
                     }
                     OutlinedButton(
-                        onClick = onOpenEpisodes,
+                        onClick = onSwitchShow,
                         modifier = Modifier.weight(1f).heightIn(min = 44.dp),
                         shape = RectangleShape,
                         contentPadding = PaddingValues(horizontal = 6.dp)
                     ) {
-                        Text("CHOOSE", fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                        Text("SWITCH SHOW", fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                     }
                 }
             }
@@ -546,7 +574,11 @@ private fun EditorialRecommendation(
 }
 
 @Composable
-private fun EditorialQueueRow(show: ShowEstimateDto, onClick: () -> Unit) {
+private fun EditorialQueueRow(
+    show: ShowEstimateDto,
+    onClick: () -> Unit,
+    onSetHero: () -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val compact = LocalCompactMode.current
     Row(
@@ -558,15 +590,26 @@ private fun EditorialQueueRow(show: ShowEstimateDto, onClick: () -> Unit) {
             Text(show.title, color = colors.onBackground, fontFamily = FontFamily.Serif, fontSize = if (compact) 17.sp else 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("${show.remainingEpisodes} left · ${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"}", color = colors.onSurfaceVariant, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
         }
-        OutlinedButton(
-            onClick = onClick,
-            shape = RectangleShape,
-            modifier = Modifier.height(34.dp),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-        ) {
-            Icon(Icons.Default.PlayArrow, null, tint = colors.primary, modifier = Modifier.size(13.dp))
-            Spacer(Modifier.width(4.dp))
-            Text("WATCH", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.onBackground)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(
+                onClick = onSetHero,
+                shape = RectangleShape,
+                modifier = Modifier.height(34.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("SET HERO", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = colors.primary)
+            }
+            Button(
+                onClick = onClick,
+                shape = RectangleShape,
+                modifier = Modifier.height(34.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = colors.onBackground, contentColor = colors.background),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(2.dp))
+                Text("WATCH", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
     Divider(color = colors.outlineVariant)
@@ -644,6 +687,110 @@ private fun EditorialEpisodesSheet(
                             Spacer(Modifier.width(4.dp))
                             IconButton(onClick = { onWatchEpisode(episode.id) }, modifier = Modifier.size(32.dp)) {
                                 Icon(Icons.Default.CheckCircle, "Mark watched", tint = colors.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    Divider(color = colors.outlineVariant)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditorialShowPickerSheet(
+    shows: List<ShowEstimateDto>,
+    selectedShowId: Int?,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val compact = LocalCompactMode.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = colors.surface,
+        contentColor = colors.onSurface,
+        shape = RectangleShape,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = colors.outline) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = if (compact) 16.dp else 20.dp)
+                .padding(bottom = if (compact) 20.dp else 28.dp)
+        ) {
+            EditorialSectionLabel("CHOOSE MAIN WATCHING SHOW")
+            Text(
+                "Select Hero Show",
+                color = colors.onSurface,
+                fontFamily = FontFamily.Serif,
+                fontSize = if (compact) 30.sp else 34.sp,
+                lineHeight = if (compact) 32.sp else 36.sp,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Text(
+                "Sets the featured show in TONIGHT with finish forecast and quick resume.",
+                color = colors.onSurfaceVariant,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = if (compact) 12.dp else 16.dp)
+            )
+            Divider(color = colors.outlineVariant)
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = if (compact) 420.dp else 480.dp)
+            ) {
+                items(shows) { show ->
+                    val isSelected = show.showId == selectedShowId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(show.showId) }
+                            .padding(vertical = if (compact) 10.dp else 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "${show.completionPercent.toInt()}%",
+                            color = colors.primary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(42.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                show.title,
+                                color = if (isSelected) colors.primary else colors.onSurface,
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 18.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                "${show.remainingEpisodes} left · ${show.remainingRuntimeDisplay ?: "${show.unwatchedMinutes}m"}",
+                                color = colors.outline,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        if (isSelected) {
+                            Text(
+                                "ACTIVE",
+                                color = colors.primary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        } else {
+                            OutlinedButton(
+                                onClick = { onSelect(show.showId) },
+                                shape = RectangleShape,
+                                modifier = Modifier.height(34.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                            ) {
+                                Text("SELECT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = colors.onSurface)
                             }
                         }
                     }

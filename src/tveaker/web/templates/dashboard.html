@@ -80,9 +80,15 @@
         <div class="ledger-heading"><p class="section-index">03 / YOUR QUEUE</p><a href="/shows?status=watching">Manage all <span aria-hidden="true">→</span></a></div>
         <div class="queue-table">
           {% for show in estimates[1:5] %}
-            <button class="queue-entry" type="button" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
-              <span class="queue-number">{{ '%02d' | format(loop.index) }}</span><span class="queue-title">{{ show.title }}</span><span class="queue-detail">{{ show.remaining_episodes }} left · {{ show.remaining_runtime_display }}</span><span class="queue-progress">{{ show.completion_percent | round(0) | int }}%</span><span class="material-symbols-rounded">arrow_forward</span>
-            </button>
+            <div class="queue-row-container" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--rule); padding: 4px 0;">
+              <button class="queue-entry" style="flex: 1; border-bottom: 0;" type="button" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">
+                <span class="queue-number">{{ '%02d' | format(loop.index) }}</span><span class="queue-title">{{ show.title }}</span><span class="queue-detail">{{ show.remaining_episodes }} left · {{ show.remaining_runtime_display }}</span><span class="queue-progress">{{ show.completion_percent | round(0) | int }}%</span>
+              </button>
+              <div style="display: flex; gap: 8px; align-items: center; padding-left: 12px;">
+                <button class="text-action" style="min-height: 36px; padding: 0 10px; font-size: 0.72rem; color: var(--signal); border-color: var(--signal);" type="button" onclick="selectHeroShow({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')">Set Hero</button>
+                <button class="icon-only" style="background: transparent; border: 0; cursor: pointer; color: var(--ink-soft);" type="button" onclick="openEpisodesDrawer({{ show.show_id }}, '{{ show.title | replace("'", "\\'") }}')"><span class="material-symbols-rounded">arrow_forward</span></button>
+              </div>
+            </div>
           {% endfor %}
         </div>
       </section>

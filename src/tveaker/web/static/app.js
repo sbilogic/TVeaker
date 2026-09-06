@@ -127,6 +127,26 @@ async function watchSpecificEpisode(showId, episodeId, epTitle) {
   }
 }
 
+// Choose a show to feature in the hero section. Sets next unwatched episode locally.
+async function selectHeroShow(showId, showTitle) {
+  try {
+    const res = await fetch('/api/v1/now-watching', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ show_id: showId }),
+    });
+    if (res.ok) {
+      showToast(`Set ${showTitle} as now watching`, 'success', 1800);
+      setTimeout(() => window.location.reload(), 400);
+    } else {
+      const err = await res.json();
+      showToast(err.detail || 'Could not select show', 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
 // Choose an exact episode to resume later. This remains local to TVeaker.
 async function selectNowWatching(episodeId, epTitle) {
   try {

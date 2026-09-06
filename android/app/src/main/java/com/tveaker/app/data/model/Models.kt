@@ -137,7 +137,8 @@ data class UpdateShowRequest(
 
 @JsonClass(generateAdapter = true)
 data class NowWatchingSelectionRequest(
-    @Json(name = "episode_id") val episodeId: Int
+    @Json(name = "episode_id") val episodeId: Int? = null,
+    @Json(name = "show_id") val showId: Int? = null
 )
 
 @JsonClass(generateAdapter = true)

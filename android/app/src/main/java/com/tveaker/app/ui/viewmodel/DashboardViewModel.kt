@@ -32,7 +32,8 @@ data class DashboardUiState(
     val currentServerUrl: String = "",
     val serverVersionInfo: AppVersionDto? = null,
     val isNewUpdateAvailable: Boolean = false,
-    val isOffline: Boolean = false
+    val isOffline: Boolean = false,
+    val selectedHeroShowId: Int? = null
 )
 
 class DashboardViewModel(
@@ -42,7 +43,8 @@ class DashboardViewModel(
     private val _uiState = MutableStateFlow(
         DashboardUiState(
             currentServerUrl = repository.currentBaseUrl.value,
-            isOffline = repository.isOffline.value
+            isOffline = repository.isOffline.value,
+            selectedHeroShowId = repository.selectedHeroShowId.value
         )
     )
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
@@ -53,11 +55,28 @@ class DashboardViewModel(
                 _uiState.value = _uiState.value.copy(isOffline = isOffline)
             }
         }
+        viewModelScope.launch {
+            repository.selectedHeroShowId.collectLatest { heroShowId ->
+                _uiState.value = _uiState.value.copy(selectedHeroShowId = heroShowId)
+            }
+        }
         loadDashboardData()
         viewModelScope.launch {
             repository.currentBaseUrl.drop(1).collectLatest { newUrl ->
                 _uiState.value = _uiState.value.copy(currentServerUrl = newUrl)
                 loadDashboardData()
+            }
+        }
+    }
+
+    fun setHeroShow(showId: Int) {
+        viewModelScope.launch {
+            val result = repository.selectNowWatchingShow(showId)
+            if (result.isSuccess) {
+                _uiState.value = _uiState.value.copy(
+                    nowWatching = result.getOrNull(),
+                    selectedHeroShowId = showId
+                )
             }
         }
     }
